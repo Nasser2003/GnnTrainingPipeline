@@ -1,0 +1,17 @@
+python-dotenv
+mlflow
+scikit-learn
+pandas
+numpy
+# install this before requirements.txt to ensure the installation order
+torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+# install this before requirements.txt to ensure the installation order
+torch-scatter==2.1.2 --find-links https://data.pyg.org/whl/torch-2.6.0+cu124.html
+torch-sparse==0.6.18 --find-links https://data.pyg.org/whl/torch-2.6.0+cu124.html
+torch-cluster==1.6.3 --find-links https://data.pyg.org/whl/torch-2.6.0+cu124.html
+torch-geometric
+hydra-core
+omegaconf
+mmh3
+pymongo
+python-dateutil
