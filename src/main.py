@@ -136,71 +136,60 @@ def main(cfg: Config) -> None:
             print("\n  >> Evaluating Baselines...")
             base_evaluator = Evaluator()
 
-            with mlflow.start_run(run_name="cosine_baseline", nested=True):
-                mlflow.log_param("model", "cosine")
-                cosine_scorer = CosineBaselineScorer()
-                base_evaluator.evaluate_metrics_master(
-                    "Cosine", test_data, neg_ratio=1.0,
-                    scorer=cosine_scorer, threshold=0.5,
-                    full_pos_edges=full_pos)
+            cosine_scorer = CosineBaselineScorer()
+            base_evaluator.evaluate_metrics_master(
+                "Cosine", test_data, neg_ratio=1.0,
+                scorer=cosine_scorer, threshold=0.5,
+                full_pos_edges=full_pos)
 
-            with mlflow.start_run(run_name="mlp_baseline", nested=True):
-                mlflow.log_params({
-                    "model": "mlp_baseline",
-                    "hidden_dim": cfg.model.hidden_dim,
-                    "learning_rate": cfg.model.learning_rate,
-                    "num_epochs": cfg.model.num_epochs,
-                })
-                mlp_model = RawMLPConcatPredictor(in_dim=in_ch, hidden=cfg.model.hidden_dim)
-                mlp_trainer = BaselineTrainer(mlp_model, lr=cfg.model.learning_rate)
-                trained_mlp = mlp_trainer.train(train_data, val_data, epochs=cfg.model.num_epochs)
-                mlp_scorer = MLPBaselineScorer(trained_mlp)
-                base_evaluator.evaluate_metrics_master(
-                    "MLP", test_data, neg_ratio=1.0,
-                    scorer=mlp_scorer, threshold=0.5,
-                    full_pos_edges=full_pos)
+            mlp_model = RawMLPConcatPredictor(in_dim=in_ch, hidden=cfg.model.hidden_dim)
+            mlp_trainer = BaselineTrainer(mlp_model, lr=cfg.model.learning_rate)
+            trained_mlp = mlp_trainer.train(train_data, val_data, epochs=cfg.model.num_epochs)
+            mlp_scorer = MLPBaselineScorer(trained_mlp)
+            base_evaluator.evaluate_metrics_master(
+                "MLP", test_data, neg_ratio=1.0,
+                scorer=mlp_scorer, threshold=0.5,
+                full_pos_edges=full_pos)
         else:
             print("\n  >> Skipping Baselines (run_baselines=false)")
 
         # ---- GNN Training + Evaluation ----
         print(f"\n  >> Training GNN: {encoder_name.upper()}")
 
-        with mlflow.start_run(run_name=encoder_name, nested=True):
-            trainer = GNNTraining(
-                output_dir=cfg.output.output_dir,
-                encoder='late-fuse' if graph_type == 'late_fuse' else encoder_name,
-                decoder=cfg.model.decoder,
-                in_channels=in_ch,
-                hidden_dim=cfg.model.hidden_dim,
-                embed_dim=cfg.model.embed_dim,
-                edge_dim=edge_dim,
-                learning_rate=cfg.model.learning_rate,
-                num_epochs=cfg.model.num_epochs,
-                weight_decay=cfg.model.weight_decay,
-                dropout=cfg.model.dropout,
-                neg_ratio=cfg.model.neg_ratio,
-                decoder_hidden=cfg.model.decoder_hidden,
-                decoder_dropout=cfg.model.decoder_dropout,
-                scheduler=cfg.model.scheduler,
-                grad_clip=grad_clip,
-                fusion=cfg.model.fusion,
-                late_fuse_base_encoder=encoder_name if graph_type == 'late_fuse' else None,
-                edge_dim_retweet=getattr(train_data, 'edge_dim_retweet', 3),
-                edge_dim_reply=getattr(train_data, 'edge_dim_reply', 3),
-                edge_dim_mention=getattr(train_data, 'edge_dim_mention', 3),
-                early_stopping_patience=cfg.model.early_stopping_patience,
-            )
+        trainer = GNNTraining(
+            output_dir=cfg.output.output_dir,
+            encoder='late-fuse' if graph_type == 'late_fuse' else encoder_name,
+            decoder=cfg.model.decoder,
+            in_channels=in_ch,
+            hidden_dim=cfg.model.hidden_dim,
+            embed_dim=cfg.model.embed_dim,
+            edge_dim=edge_dim,
+            learning_rate=cfg.model.learning_rate,
+            num_epochs=cfg.model.num_epochs,
+            weight_decay=cfg.model.weight_decay,
+            dropout=cfg.model.dropout,
+            neg_ratio=cfg.model.neg_ratio,
+            decoder_hidden=cfg.model.decoder_hidden,
+            decoder_dropout=cfg.model.decoder_dropout,
+            scheduler=cfg.model.scheduler,
+            grad_clip=grad_clip,
+            fusion=cfg.model.fusion,
+            late_fuse_base_encoder=encoder_name if graph_type == 'late_fuse' else None,
+            edge_dim_retweet=getattr(train_data, 'edge_dim_retweet', 3),
+            edge_dim_reply=getattr(train_data, 'edge_dim_reply', 3),
+            edge_dim_mention=getattr(train_data, 'edge_dim_mention', 3),
+            early_stopping_patience=cfg.model.early_stopping_patience,
+        )
 
-            model = trainer.train(train_loader, val_data)
+        model = trainer.train(train_loader, val_data)
 
-            gnn_eval = GNNEvaluator(model=model)
-            gnn_eval.evaluate(
-                val_data, test_data,
-                neg_ratios=list(cfg.evaluation.neg_ratios),
-                full_pos_edges=full_pos,
-            )
+        gnn_eval = GNNEvaluator(model=model)
+        gnn_eval.evaluate(
+            val_data, test_data,
+            neg_ratios=list(cfg.evaluation.neg_ratios),
+            full_pos_edges=full_pos,
+        )
 
-        # Log model on the parent run so the "Models" column is always populated
         mlflow.pytorch.log_model(
             model,
             name="model",
