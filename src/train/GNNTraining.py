@@ -4,8 +4,8 @@ import mlflow
 import torch
 import torch.nn.functional as F
 
-from gnn.model.ModelFactory import ModelFactory
-from gnn.utils.GraphUtils import GraphUtils
+from model.ModelFactory import ModelFactory
+from utils.GraphUtils import GraphUtils
 
 
 class GNNTraining:

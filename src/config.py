@@ -1,22 +1,23 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, List
-
+from typing import List
 from hydra.core.config_store import ConfigStore
 
 
 @dataclass
 class DataConfig:
+    base_dir: str
+    run_id: str
     data_dir: str
-    graph_type: Dict[str, bool]
-    train_ratio: float
-    val_ratio: float
-    test_ratio: float
-
+    load_graph_if_exists: bool
+    graph_type: str
+    split: List[float]
 
 @dataclass
 class ModelConfig:
-    encoder: Dict[str, bool]
+    encoder: str
     decoder: str
+    run_baselines: bool
     num_epochs: int
     learning_rate: float
     weight_decay: float
@@ -44,6 +45,7 @@ class EvaluationConfig:
 class OutputConfig:
     output_dir: str
     log_dir: str
+    graph_dir: str
     mlflow_tracking_uri: str
 
 
@@ -56,4 +58,4 @@ class Config:
 
 
 cs = ConfigStore.instance()
-cs.store(name="base_config", node=Config)
+cs.store(name="config_schema", node=Config)

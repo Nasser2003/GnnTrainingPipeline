@@ -3,21 +3,23 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      data.graph_types: reply, retweet, mention, late_fuse
-      model.encoder: gnn, gat, gatv2, gine, sage, transformer, nnconv
-
-  sweep:
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.num}
+      data.graph_type: reply, retweet, mention, late_fuse
+      model.encoder: gcn, gat, gatv2, gine, sage, transformer, nnconv
+    dir: results/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num} # Chaque combinaison aura son sous-dossier (0, 1, 2...)
+  run:
+    dir: results/single/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 data:
   data_dir: ../GraphAnalysis/resources/217a03a0498411f180769c29764a0d18
-  graph_types: late_fuse
+  load_graph_if_exists: true
+  graph_type: late_fuse
   split: [0.70, 0.15, 0.15]
 
 model:
   encoder: gine
   decoder: mlp
+  run_baselines: false
   num_epochs: 50
   learning_rate: 0.001
   weight_decay: 1e-5
@@ -39,6 +41,12 @@ evaluation:
   neg_ratios: [1, 9, 100]
 
 output:
-  output_dir: output/models
-  log_dir: output/logs
-  mlflow_tracking_uri: sqlite:///mlflow.db
+  output_dir: models
+  log_dir: logs/
+  graph_dir: graphs/
+  mlflow_tracking_uri: sqlite:///mlflow/mlflow.db
+
+
+defaults:
+  - config_schema
+  - _self_

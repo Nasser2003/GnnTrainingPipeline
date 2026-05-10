@@ -6,8 +6,3 @@ from .SAGEEncoder import SAGEEncoder
 from .TransformerEncoder import TransformerEncoder
 from .NNConvEncoder import NNConvEncoder
 from .LateFuseEncoder import LateFuseEncoder
-
-__all__ = [
-    'GCNEncoder', 'GATEncoder', 'GATv2Encoder', 'GINEEncoder',
-    'SAGEEncoder', 'TransformerEncoder', 'NNConvEncoder', 'LateFuseEncoder',
-]

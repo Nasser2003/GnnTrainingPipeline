@@ -1,0 +1,71 @@
+name: Run Training Pipeline
+
+on:
+  push:
+    branches:
+      - 'exp/*'
+  workflow_dispatch:
+    inputs:
+      config_name:
+        description: 'Hydra config name without extension (e.g., config, config_ipazia)'
+        required: true
+        default: 'config'
+
+jobs:
+  train:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Podman Image
+        run: |
+          podman build -t gnn_training -f docker/Dockerfile .
+
+      - name: Prepare Host Directories
+        run: |
+          mkdir -p ~/training/models ~/training/graphs ~/training/logs ~/mlflow/artifacts
+
+      - name: Ensure MLflow Server is Running
+        run: |
+          # Start the MLflow container if it doesn't exist
+          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow_ui$"; then
+            podman run -d --name mlflow_ui --replace \
+              -p 5000:5000 \
+              -v ~/mlflow:/mlflow \
+              ghcr.io/mlflow/mlflow:v2.10.0 \
+              mlflow server \
+              --backend-store-uri sqlite:////mlflow/mlflow.db \
+              --default-artifact-root /mlflow/artifacts \
+              --host 0.0.0.0
+          # If it exists but is stopped, restart it
+          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow_ui$"; then
+            podman start mlflow_ui
+          fi
+
+      - name: Run Training Container
+        run: |
+          # Select the config file to use (dispatch input or 'config' fallback for pushes)
+          CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
+
+          # For Podman GPU passthrough, we use --device nvidia.com/gpu=all (via CDI)
+          # We append `--config-name $CONFIG_NAME` at the end.
+          # Since passing arguments to `podman run` overwrites the Dockerfile's CMD, 
+          # we explicitly pass the data/output paths here to match the mounted volumes.
+          podman run --rm --replace \
+            --name gnn_training \
+            --device nvidia.com/gpu=all \
+            --network host \
+            -v ~/extraction/output:/data:ro \
+            -v ~/training/models:/app/models \
+            -v ~/training/graphs:/app/graphs \
+            -v ~/training/logs:/app/logs \
+            -v ~/mlflow:/app/mlruns \
+            gnn_training \
+            --config-name $CONFIG_NAME \
+            data.data_dir=/data \
+            output.output_dir=/app/models \
+            output.graph_dir=/app/graphs \
+            output.log_dir=/app/logs \
+            output.mlflow_tracking_uri=http://localhost:5000

@@ -3,6 +3,9 @@ FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN pip install pyg-lib -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
+
 COPY requirements.txt .
 
 # Install PyG CUDA wheels then remaining deps
@@ -16,15 +19,14 @@ RUN pip install --no-cache-dir \
 
 COPY src/ ./src/
 COPY conf/ ./conf/
+COPY .git/ ./.git/
 
-ENV PYTHONPATH=/app/src
+ENV DATA_DIR=/app/data
 
-# /data      → GraphAnalysis resources (read-only)
-# /app/output → model checkpoints
-# /app/mlruns → MLflow tracking store
-VOLUME ["/data", "/app/output", "/app/mlruns"]
+# /app/data    → Source features (from GraphAnalysis)
+# /app/outputs → Training results (models, logs, graphs)
+VOLUME ["/app/data", "/app/outputs"]
 
 ENTRYPOINT ["python", "src/main.py"]
-CMD ["data.data_dir=/data", \
-     "output.output_dir=/app/output", \
-     "output.mlflow_tracking_uri=sqlite:////app/mlruns/mlflow.db"]
+# No default CMD needed, Hydra will read DATA_DIR from environment
+CMD []

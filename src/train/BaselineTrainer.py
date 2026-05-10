@@ -1,7 +1,7 @@
 import mlflow
 import torch
 import torch.nn.functional as F
-from gnn.utils.GraphUtils import GraphUtils
+from utils.GraphUtils import GraphUtils
 
 
 class BaselineTrainer:

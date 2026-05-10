@@ -1,5 +1,5 @@
-from gnn.evaluation.Evaluator import Evaluator
-from gnn.evaluation.GNNScorer import GNNScorer
+from evaluation.Evaluator import Evaluator
+from evaluation.GNNScorer import GNNScorer
 
 
 class GNNEvaluator(Evaluator):

@@ -1,0 +1,58 @@
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      data.graph_type: reply,retweet,mention,late_fuse
+      model.encoder: gcn,gat,gatv2,gine,sage,transformer,nnconv
+  run:
+    dir: outputs/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+data:
+  # Base directory for all extraction runs
+  base_dir: ${oc.env:DATA_DIR, "../GraphAnalysis/resources"}
+  # Specific extraction run ID
+  run_id: ${oc.env:RUN_ID, "add1322e4c9011f1b7318ae8655e7b49"}
+  
+  # Combined path used by the pipeline
+  data_dir: ${data.base_dir}/${data.run_id}
+  load_graph_if_exists: true
+  graph_type: reply
+  split: [0.70, 0.15, 0.15]
+
+model:
+  encoder: gine
+  decoder: mlp
+  run_baselines: false
+  num_epochs: 50
+  learning_rate: 0.001
+  weight_decay: 1e-5
+  hidden_dim: 128
+  embed_dim: 64
+  dropout: 0.2
+  neg_ratio: 1.0
+  decoder_hidden: 64
+  decoder_dropout: 0.3
+  scheduler: false
+  grad_clip: 0.0
+  early_stopping_patience: 10
+  seed: 777
+  fusion: mean
+  batch_size: 512
+  num_neighbors: [10, 5]
+
+evaluation:
+  neg_ratios: [1, 9, 100]
+
+output:
+  output_dir: outputs/models/
+  log_dir: outputs/logs/
+  graph_dir: outputs/graphs/
+  mlflow_tracking_uri: sqlite:///outputs/mlflow/mlflow.db
+
+
+defaults:
+  - config_schema
+  - _self_

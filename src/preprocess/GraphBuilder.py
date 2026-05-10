@@ -10,48 +10,55 @@ All nodes are always present regardless of edge type.
 
 import math
 import os
+import pickle
 import sys
 from pathlib import Path
 
+import pandas as pd
 import torch
 from torch_geometric.data import Data
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from gnn.utils.Utils import Utils
+from utils.Utils import Utils
 
 def _parse_uid(val):
     try:
         return int(val)
-    except ValueError:
-        return Utils.from_node_id(val)
+    except (ValueError, TypeError):
+        return val  # Passthrough if not an int (fallback)
 
 class GraphBuilder:
-    """Build PyG Data objects from extracted CSV files."""
+    """Build PyG Data objects from extracted files (CSV, Parquet, or Pickle)."""
 
-    # Edge file names by type
-    EDGE_FILES = {
-        'retweet': 'edges_retweet.csv',
-        'reply': 'edges_reply.csv',
-        'mention': 'edges_mention.csv',
-    }
-
-    def __init__(self, data_dir: str, graph_type: str):
+    def __init__(self, data_dir: str, graph_dir: str, graph_type: str, load_graph_if_exists: bool = False):
         """
         Args:
-            data_dir: Path to the extraction output directory (e.g. 'resources/<run_id>')
+            data_dir: Path to the extraction output directory
+            graph_dir: Path to the directory where graphs should be saved/loaded
             graph_type: One of 'mention', 'retweet', 'reply', 'late_fuse'
+            load_graph_if_exists: If True, skip building if the graph .pt file already exists
         """
         self.data_dir = Path(data_dir)
+        self.graph_dir = Path(graph_dir)
         self.graph_type = graph_type
+        self.load_graph_if_exists = load_graph_if_exists
+
+    def _find_file(self, base_name: str) -> Path:
+        """Find a file with parquet, pkl, or csv extension."""
+        for ext in ['.parquet', '.pkl', '.csv']:
+            path = self.data_dir / (base_name + ext)
+            if path.exists():
+                return path
+        return None
 
     def build_and_save(self) -> str:
         """Build and save the graph as a .pt file. Returns the path to the saved file."""
-        output_dir = self.data_dir / 'graphs'
+        output_dir = self.graph_dir
         output_dir.mkdir(parents=True, exist_ok=True)
         pt_path = output_dir / f'graph_{self.graph_type}.pt'
 
-        if pt_path.exists():
-            print(f"  [GraphBuilder] Graph already exists: {pt_path}")
+        if self.load_graph_if_exists and pt_path.exists():
+            print(f"  [GraphBuilder] Graph already exists, skipping extraction: {pt_path}")
             return str(pt_path)
 
         print(f"  [GraphBuilder] Building graph: {self.graph_type} from {self.data_dir}")
@@ -71,75 +78,71 @@ class GraphBuilder:
         return str(pt_path)
 
     # ----------------------------------------------------------------
+    # Universal Loader
+    # ----------------------------------------------------------------
+    def _load_any_format(self, file_path: Path):
+        """Load a file regardless of its extension."""
+        ext = file_path.suffix.lower()
+        if ext == '.parquet':
+            return pd.read_parquet(file_path)
+        elif ext == '.pkl':
+            with open(file_path, 'rb') as f:
+                data = []
+                while True:
+                    try:
+                        data.extend(pickle.load(f))
+                    except EOFError:
+                        break
+                return pd.DataFrame(data)
+        else:
+            return pd.read_csv(file_path)
+
+    # ----------------------------------------------------------------
     # Node features
     # ----------------------------------------------------------------
     def _load_user_features(self):
-        """Load user features CSV and return (feature_tensor, uid_to_idx mapping)."""
-        feat_path = self.data_dir / 'user_features.csv'
-        if not feat_path.exists():
-            raise FileNotFoundError(f"User features not found: {feat_path}")
+        """Load user features and return (feature_tensor, uid_to_idx mapping)."""
+        feat_path = self._find_file('user_features')
+        if not feat_path:
+            raise FileNotFoundError(f"User features not found in {self.data_dir}")
 
-        uid_to_idx = {}
-        features = []
+        print(f"    [GraphBuilder] Loading user features from {feat_path.name}")
+        df = self._load_any_format(feat_path)
 
-        with open(feat_path, 'r', encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                if i == 0:
-                    continue  # skip header
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split(',')
-                # Format: user_id, total, retweets, replies, original, likes,
-                #         followers, following, verified, account_age_days,
-                #         n_unique_hashtags, n_unique_mentions, screen_name
-                if len(parts) < 13:
-                    continue
+        # Mapping names if they exist, or using new indices
+        cols_to_extract = [
+            'total', 'retweets', 'replies', 'original', 'likes',
+            'followers', 'following', 'verified', 'account_date',
+            'n_unique_hashtags', 'n_unique_mentions'
+        ]
 
-                uid = _parse_uid(parts[0])
-                if uid not in uid_to_idx:
-                    uid_to_idx[uid] = len(uid_to_idx)
+        # Compatibility check: if columns are not named, use indices based on new GraphAnalysis format
+        if not isinstance(df.columns[0], str) or 'user_node_id' not in df.columns:
+            # Fallback to index-based if it's a raw CSV without header
+            # New format indices: 0:uid, 1:total, 2:rt, 3:rep, 4:orig, 5:likes, 6:foll, 7:friends, 8:ver, 9:date, 13:ht, 14:men
+            indices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14]
+            features_raw = df.iloc[:, indices].values
+            uids = df.iloc[:, 0].apply(_parse_uid).values
+        else:
+            features_raw = df[cols_to_extract].values
+            uids = df['user_node_id'].apply(_parse_uid).values
 
-                # 11 numeric features (exclude user_id and screen_name)
-                raw = [float(parts[i]) for i in range(1, 12)]
-                features.append(self._build_feature_vector(raw))
-
+        uid_to_idx = {uid: i for i, uid in enumerate(uids)}
+        
+        # Apply normalization
+        features = [self._build_feature_vector(row) for row in features_raw]
         node_features = torch.tensor(features, dtype=torch.float)
+        
         return node_features, uid_to_idx
 
     @staticmethod
     def _build_feature_vector(raw_values: list) -> list:
-        """Convert raw user stats to feature vector.
-
-        To disable normalization, comment out the normalize block below
-        and uncomment the raw passthrough.
-        """
-        # raw_values = [total, retweets, replies, original, likes,
-        #               followers, following, verified, account_age_days,
-        #               n_unique_hashtags, n_unique_mentions]
-
-        # --- RAW PASSTHROUGH (uncomment to disable normalization) ---
-        # return [float(v) for v in raw_values]
-
-        # --- NORMALIZED (comment out to use raw values) ---
-        # Each divisor controls the log1p scaling for that feature.
-        # Higher divisor → more compression. 1 means binary passthrough.
-        NORMS = [
-            10,   # total tweets:        log1p(x)/10
-            10,   # retweets:            log1p(x)/10
-            10,   # replies:             log1p(x)/10
-            10,   # original tweets:     log1p(x)/10
-            15,   # likes:               log1p(x)/15  (wider range)
-            15,   # followers:           log1p(x)/15  (wider range)
-            12,   # following:           log1p(x)/12
-            1,    # verified:            binary passthrough
-            10,   # account_age_days:    log1p(x)/10
-            8,    # n_unique_hashtags:   log1p(x)/8
-            8,    # n_unique_mentions:   log1p(x)/8
-        ]
+        """Convert raw user stats to feature vector."""
+        # Mapping: total, retweets, replies, original, likes, followers, following, verified, account_date, hashtags, mentions
+        NORMS = [10, 10, 10, 10, 15, 15, 12, 1, 10, 8, 8]
         result = []
         for v, div in zip(raw_values, NORMS):
-            if div == 1:  # binary feature (verified)
+            if div == 1:
                 result.append(float(v))
             else:
                 result.append(math.log1p(max(float(v), 0)) / div)
@@ -149,46 +152,36 @@ class GraphBuilder:
     # Edge loading
     # ----------------------------------------------------------------
     def _load_edges(self, edge_type: str, uid_to_idx: dict):
-        """Load an edge CSV and return (edge_index [2, E], edge_attr [E, D]).
-
-        Edge file format: src_uid, dst_uid, weight[, extra_features...]
-        All columns after src and dst are treated as edge features.
-        """
-        edge_file = self.data_dir / self.EDGE_FILES[edge_type]
-        if not edge_file.exists():
-            print(f"    WARNING: Edge file not found: {edge_file}")
+        """Load an edge file and return (edge_index [2, E], edge_attr [E, D])."""
+        base_name = f'edges_{edge_type}'
+        edge_path = self._find_file(base_name)
+        
+        if not edge_path:
+            print(f"    WARNING: Edge file {base_name} not found in {self.data_dir}")
             return (
                 torch.empty((2, 0), dtype=torch.long),
                 torch.empty((0, 1), dtype=torch.float),
             )
 
+        print(f"    [GraphBuilder] Loading {edge_type} edges from {edge_path.name}")
+        df = self._load_any_format(edge_path)
+
+        # Columns 0 and 1 are src and dst
+        src_uids = df.iloc[:, 0].apply(_parse_uid).values
+        dst_uids = df.iloc[:, 1].apply(_parse_uid).values
+        
+        # Other columns are features
+        feat_raw = df.iloc[:, 2:].values
+
         src_list, dst_list = [], []
         feat_list = []
 
-        with open(edge_file, 'r', encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                if i == 0:
-                    continue  # skip header
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split(',')
-                if len(parts) < 3:
-                    continue
-
-                src_uid = _parse_uid(parts[0])
-                dst_uid = _parse_uid(parts[1])
-
-                # Skip edges with unknown nodes
-                if src_uid not in uid_to_idx or dst_uid not in uid_to_idx:
-                    continue
-
-                src_list.append(uid_to_idx[src_uid])
-                dst_list.append(uid_to_idx[dst_uid])
-
-                # All columns from index 2 onward are edge features
-                raw_feats = [float(p) for p in parts[2:]]
-                feat_list.append(raw_feats)
+        for i in range(len(df)):
+            s_uid, d_uid = src_uids[i], dst_uids[i]
+            if s_uid in uid_to_idx and d_uid in uid_to_idx:
+                src_list.append(uid_to_idx[s_uid])
+                dst_list.append(uid_to_idx[d_uid])
+                feat_list.append(feat_raw[i])
 
         if not src_list:
             return (
@@ -197,10 +190,9 @@ class GraphBuilder:
             )
 
         edge_index = torch.tensor([src_list, dst_list], dtype=torch.long)
-
-        # Build edge_attr — normalize weight with log1p
         feat_tensor = torch.tensor(feat_list, dtype=torch.float)
-        # Normalize the first column (weight) with log1p / 5
+        
+        # Normalize weight (first feature column) with log1p / 5.0
         if feat_tensor.size(1) > 0:
             feat_tensor[:, 0] = torch.log1p(feat_tensor[:, 0]) / 5.0
 

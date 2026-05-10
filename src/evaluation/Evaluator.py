@@ -6,7 +6,7 @@ from sklearn.metrics import (
     roc_auc_score, average_precision_score,
     precision_recall_curve, auc
 )
-from gnn.utils.GraphUtils import GraphUtils
+from utils.GraphUtils import GraphUtils
 
 
 class Evaluator:
