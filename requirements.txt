@@ -12,6 +12,7 @@ torch-cluster==1.6.3 --find-links https://data.pyg.org/whl/torch-2.6.0+cu124.htm
 torch-geometric
 hydra-core
 omegaconf
+hydra-joblib-launcher
 mmh3
 pymongo
 python-dateutil

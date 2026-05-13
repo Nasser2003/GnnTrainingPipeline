@@ -143,6 +143,8 @@ jobs:
             gnn_training \
             --multirun \
             --config-name ${{ env.CONFIG_NAME }} \
+            hydra/launcher=joblib \
+            hydra.launcher.n_jobs=2 \
             data.run_id="${{ env.RUN_ID }}" \
             output.output_dir=/app/outputs/models \
             output.graph_dir=/app/outputs/graphs \
