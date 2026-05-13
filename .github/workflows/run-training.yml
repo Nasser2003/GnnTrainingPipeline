@@ -33,7 +33,7 @@ jobs:
           echo "CONFIG_NAME=${INPUT_CONFIG:-config_ipazia}" >> $GITHUB_ENV
           
           INPUT_RUN_ID="${{ github.event.inputs.run_id }}"
-          echo "RUN_ID=${INPUT_RUN_ID}" >> $GITHUB_ENV
+          echo "RUN_ID=${INPUT_RUN_ID:-$RUN_ID}" >> $GITHUB_ENV
 
       - name: Build Podman Image
         run: |
