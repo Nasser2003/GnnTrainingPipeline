@@ -32,9 +32,9 @@ jobs:
 
       - name: Ensure PostgreSQL is Running
         run: |
-          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
+          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow_db$"; then
             # First run: create the container and initialize the DB
-            podman run -d --name mlflow-db \
+            podman run -d --name mlflow_db \
               --network host \
               -e POSTGRES_USER=mlflow \
               -e POSTGRES_PASSWORD="${{ secrets.MLFLOW_DB_PASS }}" \
