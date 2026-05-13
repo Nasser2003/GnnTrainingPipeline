@@ -23,11 +23,6 @@ from utils.gpu_manager import acquire_gpu, release_gpu
 import warnings
 
 warnings.filterwarnings("ignore")
-
-# Silence noisy MLflow warnings
-logging.getLogger("mlflow.pytorch").setLevel(logging.ERROR)
-logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
-
 log = logging.getLogger(__name__)
 
 def set_seed(seed: int) -> None:
@@ -40,6 +35,12 @@ def set_seed(seed: int) -> None:
 
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: Config) -> None:
+    # Re-apply filters inside the worker process (required for joblib multiprocessing)
+    import warnings
+    warnings.filterwarnings("ignore")
+    logging.getLogger("mlflow.pytorch").setLevel(logging.ERROR)
+    logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
+
     # --- Pre-flight: verify extraction data directory and required files ---
     data_path = os.path.abspath(cfg.data.data_dir)
     log.info(f"Checking extraction data directory: {data_path}")

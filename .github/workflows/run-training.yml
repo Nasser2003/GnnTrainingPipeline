@@ -50,24 +50,25 @@ jobs:
           mkdir -p /ipazianas/pasquini/training/multirun \
           mkdir -p /ipazianas/pasquini/training/results \
 
+      - name: Setup MLflow Network
+        run: |
+          podman network exists mlflow-net || podman network create mlflow-net
+
       - name: Ensure PostgreSQL is Running
         run: |
-          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow_db$"; then
-            # First run: create the container and initialize the DB
-            podman run -d --name mlflow_db \
-              --network host \
-              -e POSTGRES_USER=mlflow \
-              -e POSTGRES_PASSWORD="${{ secrets.MLFLOW_DB_PASS }}" \
-              -e POSTGRES_DB=mlflow_db \
-              -v mlflow-pgdata:/var/lib/postgresql/data \
-              postgres:15
-            echo "Waiting for PostgreSQL to be ready..."
-            sleep 15
-          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow_db$"; then
-            # Container exists but is stopped: restart it, then force-sync the password
-            podman start mlflow_db
-            sleep 5
-          fi
+          # Clean up old host-networked container (data is safe in the volume)
+          podman rm -f mlflow_db 2>/dev/null || true
+          
+          # Run DB in the dedicated network
+          podman run -d --name mlflow_db \
+            --network mlflow-net \
+            -e POSTGRES_USER=mlflow \
+            -e POSTGRES_PASSWORD="${{ secrets.MLFLOW_DB_PASS }}" \
+            -e POSTGRES_DB=mlflow_db \
+            -v mlflow-pgdata:/var/lib/postgresql/data \
+            postgres:15
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 10
 
       - name: Ensure MLflow Server is Running
         run: |
@@ -90,7 +91,8 @@ jobs:
 
             # 3. Run MLflow Server
             podman run -d --name mlflow_ui --replace \
-              --network host \
+              --network mlflow-net \
+              -p 5000:5000 \
               -v /ipazianas/pasquini/mlflow:/mlflow:Z \
               -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
               -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
@@ -98,7 +100,7 @@ jobs:
               mlflow-auth \
               mlflow server \
                 --app-name basic-auth \
-                --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@127.0.0.1:5432/mlflow_db" \
+                --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@mlflow_db:5432/mlflow_db" \
                 --default-artifact-root /mlflow/artifacts \
                 --host 0.0.0.0 \
                 --port 5000
