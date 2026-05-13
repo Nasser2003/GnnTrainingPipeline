@@ -89,9 +89,15 @@ jobs:
           # Select the config file to use (dispatch input or 'config' fallback for pushes)
           CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
 
+          # Collecter tous les devices Nvidia
+          DEVICE_FLAGS=()
+          for dev in /dev/nvidia* /dev/nvidia-caps/*; do
+            [ -e "$dev" ] && DEVICE_FLAGS+=("--device $dev")
+          done
+          
           podman run --rm --replace \
+            ${DEVICE_FLAGS[@]} \
             --name gnn_training \
-            --device nvidia.com/gpu=all \
             --network host \
             -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
             -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
