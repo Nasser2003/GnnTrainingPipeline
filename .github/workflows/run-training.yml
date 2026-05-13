@@ -55,12 +55,12 @@ jobs:
           fi
 
           # 2. Ensure auth_config.ini exists (Auth metadata remains in SQLite for simplicity or can be moved too)
-          if [ ! -f ~/mlflow/auth_config.ini ]; then
-            echo "[mlflow]" > ~/mlflow/auth_config.ini
-            echo "default_permission = READ" >> ~/mlflow/auth_config.ini
-            echo "database_uri = sqlite:///mlflow/auth.db" >> ~/mlflow/auth_config.ini
-            echo "admin_username = ${{ secrets.MLFLOW_AUTH_USER }}" >> ~/mlflow/auth_config.ini
-            echo "admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}" >> ~/mlflow/auth_config.ini
+          if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
+            echo "[mlflow]" > /ipazianas/pasquini/mlflow/auth_config.ini
+            echo "default_permission = READ" >> /ipazianas/pasquini/mlflow/auth_config.ini
+            echo "database_uri = sqlite:///mlflow/auth.db" >> /ipazianas/pasquini/mlflow/auth_config.ini
+            echo "admin_username = ${{ secrets.MLFLOW_AUTH_USER }}" >> /ipazianas/pasquini/mlflow/auth_config.ini
+            echo "admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}" >> /ipazianas/pasquini/mlflow/auth_config.ini
           fi
 
           # 3. Start the MLflow container with PostgreSQL backend
@@ -68,7 +68,7 @@ jobs:
             podman run -d --name mlflow_ui --replace \
               -p 5000:5000 \
               --network host \
-              -v ~/mlflow:/mlflow \
+              -v /ipazianas/pasquini/mlflow:/mlflow \
               -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
               -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
               -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
