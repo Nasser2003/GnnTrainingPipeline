@@ -39,6 +39,7 @@ jobs:
               -e POSTGRES_PASSWORD=${{ secrets.MLFLOW_DB_PASS }} \
               -e POSTGRES_DB=mlflow_db \
               -v mlflow-pgdata:/var/lib/postgresql/data \
+              postgres:15
           fi
 
       - name: Ensure MLflow Server is Running
