@@ -35,7 +35,7 @@ production
 podman run --gpus all \
   --network host \
   -e DATA_DIR=/app/data \
-  -v /ipazianas/pasquini/extraction/output:/app/data:ro \
+  -v /ipazianas/pasquini/extraction/outputs:/app/data:ro \
   -v /ipazianas/pasquini/training/outputs:/app/outputs \
   -v ./conf:/app/conf \
   -e "MLFLOW_TRACKING_URI=http://localhost:5000" \

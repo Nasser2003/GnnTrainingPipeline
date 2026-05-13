@@ -12,9 +12,9 @@ hydra:
 
 data:
   # Base directory for all extraction runs
-  base_dir: /ipazianas/pasquini/extraction/outputs
+  base_dir: /app/data
   # Specific extraction run ID
-  run_id: add1322e4c9011f1b7318ae8655e7b49
+  run_id: a6b91cc04ee511f1a18608f1eaf4fe18
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}
@@ -47,9 +47,9 @@ evaluation:
   neg_ratios: [1, 9, 100]
 
 output:
-  output_dir: /ipazianas/pasquini/training/models
-  log_dir: /ipazianas/pasquini/training/logs
-  graph_dir: /ipazianas/pasquini/training/graphs
+  output_dir: /outputs/models
+  log_dir: /outputs/logs
+  graph_dir: /outputs/graphs
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///outputs/mlflow/mlflow.db"}
 

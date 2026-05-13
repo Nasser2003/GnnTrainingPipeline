@@ -98,6 +98,8 @@ jobs:
             ${DEVICE_FLAGS[@]} \
             --name gnn_training \
             --network host \
+            -v /ipazianas/pasquini/extraction/outputs:/app/data:ro \
+            -v /ipazianas/pasquini/training/outputs:/app/outputs \
             -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
             -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
             -e "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_AUTH_PASS }}" \
