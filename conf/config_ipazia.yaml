@@ -1,19 +1,25 @@
 hydra:
-  # Default multi-run activated
   mode: MULTIRUN
   sweeper:
     params:
-      data.graph_type: reply, retweet, mention, late_fuse
-      model.encoder: gcn, gat, gatv2, gine, sage, transformer, nnconv
-    dir: results/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
-    subdir: ${hydra.job.num} # Chaque combinaison aura son sous-dossier (0, 1, 2...)
+      data.graph_type: reply,retweet,mention,late_fuse
+      model.encoder: gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
-    dir: results/single/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
 
 data:
-  data_dir: ../GraphAnalysis/resources/217a03a0498411f180769c29764a0d18
+  # Base directory for all extraction runs
+  base_dir: /ipazianas/pasquini/extraction/outputs
+  # Specific extraction run ID
+  run_id: add1322e4c9011f1b7318ae8655e7b49
+  
+  # Combined path used by the pipeline
+  data_dir: ${data.base_dir}/${data.run_id}
   load_graph_if_exists: true
-  graph_type: late_fuse
+  graph_type: reply
   split: [0.70, 0.15, 0.15]
 
 model:
@@ -41,10 +47,11 @@ evaluation:
   neg_ratios: [1, 9, 100]
 
 output:
-  output_dir: models
-  log_dir: logs/
-  graph_dir: graphs/
-  mlflow_tracking_uri: sqlite:///mlflow/mlflow.db
+  output_dir: /ipazianas/pasquini/training/models
+  log_dir: /ipazianas/pasquini/training/logs
+  graph_dir: /ipazianas/pasquini/training/graphs
+  # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
+  mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///outputs/mlflow/mlflow.db"}
 
 
 defaults:

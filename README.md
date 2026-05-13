@@ -35,16 +35,14 @@ production
 podman run --gpus all \
   --network host \
   -e DATA_DIR=/app/data \
-  -e RUN_ID=add1322e4c9011f1b7318ae8655e7b49 \
   -v /ipazianas/pasquini/extraction/output:/app/data:ro \
   -v /ipazianas/pasquini/training/outputs:/app/outputs \
   -v ./conf:/app/conf \
-  -e RUN_ID=add1322e4c9011f1b7318ae8655e7b49 \
   -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
   -e "MLFLOW_TRACKING_USERNAME=admin" \
   -e "MLFLOW_TRACKING_PASSWORD=password12345" \
   gnn-pipeline
-  # --multirun \
+  --multirun
   # model.encoder='gine,gcn,gat,sage' \
   # data.graph_type='reply' \
   # hydra/launcher=joblib \

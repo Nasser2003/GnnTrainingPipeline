@@ -12,9 +12,9 @@ hydra:
 
 data:
   # Base directory for all extraction runs
-  base_dir: ${oc.env:DATA_DIR, "../GraphAnalysis/resources"}
+  base_dir: ../GraphAnalysis/resources
   # Specific extraction run ID
-  run_id: ${oc.env:RUN_ID, "add1322e4c9011f1b7318ae8655e7b49"}
+  run_id: add1322e4c9011f1b7318ae8655e7b49
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}

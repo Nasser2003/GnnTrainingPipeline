@@ -9,7 +9,7 @@ on:
       config_name:
         description: 'Hydra config name without extension (e.g., config, config_ipazia)'
         required: true
-        default: 'config'
+        default: 'config_ipazia'
 
 jobs:
   train:
@@ -25,7 +25,7 @@ jobs:
 
       - name: Prepare Host Directories
         run: |
-          mkdir -p ~/training/models ~/training/graphs ~/training/logs ~/mlflow/artifacts
+          mkdir -p /ipazianas/pasquini/training/models /ipazianas/pasquini/training/graphs /ipazianas/pasquini/training/logs /ipazianas/pasquini/mlflow/artifacts
 
       - name: Ensure PostgreSQL is Running
         run: |
@@ -35,7 +35,7 @@ jobs:
               -e POSTGRES_USER=mlflow \
               -e POSTGRES_PASSWORD=${{ secrets.MLFLOW_DB_PASS }} \
               -e POSTGRES_DB=mlflow_db \
-              -v ~/mlflow/postgres_data:/var/lib/postgresql/data \
+              -v /ipazianas/pasquini/mlflow/postgres_data:/var/lib/postgresql/data \
               postgres:15
             # Wait for PG to be ready
             sleep 10
@@ -93,13 +93,11 @@ jobs:
             -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
             -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
             -e "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_AUTH_PASS }}" \
-            -v ~/extraction/output:/data:ro \
-            -v ~/training/models:/app/models \
-            -v ~/training/graphs:/app/graphs \
-            -v ~/training/logs:/app/logs \
+            -v ${{ github.workspace }}/conf:/app/conf \
             gnn_training \
+            --multirun \
             --config-name $CONFIG_NAME \
-            data.data_dir=/data \
+            data.data_dir=/app/data \
             output.output_dir=/app/models \
             output.graph_dir=/app/graphs \
             output.log_dir=/app/logs
