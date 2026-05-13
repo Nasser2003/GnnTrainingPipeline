@@ -93,7 +93,7 @@ jobs:
 
       - name: Verify Extraction Run ID
         run: |
-          CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
+          CONFIG_NAME="${{ github.event.inputs.config_name }}"
           CONFIG_FILE="${{ github.workspace }}/conf/${CONFIG_NAME}.yaml"
 
           # Use dispatch input if provided, otherwise read from config file
@@ -127,7 +127,7 @@ jobs:
       - name: Run Training Container
         run: |
           # Select the config file to use (dispatch input or 'config' fallback for pushes)
-          CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
+          CONFIG_NAME="${{ github.event.inputs.config_name }}"
 
           # Collect all GPU devices
           DEVICE_FLAGS=()
@@ -147,7 +147,7 @@ jobs:
             -v ${{ github.workspace }}/conf:/app/conf \
             gnn_training \
             --multirun \
-            --config-name $CONFIG_NAME \
+            --config-name ${CONFIG_NAME}.yaml \
             data.run_id="${RUN_ID}" \
             output.output_dir=/app/outputs/models \
             output.graph_dir=/app/outputs/graphs \

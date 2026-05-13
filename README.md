@@ -51,7 +51,7 @@ podman run --gpus all \
 
 custom parameters:
 ```bash
-podman run -v ../GraphAnalysis/resources:/app/data -e RUN_ID=add1322e4c9011f1b7318ae8655e7b49 -v ./outputs:/app/outputs gnn-pipeline --multirun model.encoder='gine,gcn,gat,sage' data.graph_type='reply'
+podman run -v ../GraphAnalysis/resources:/app/data -e RUN_ID=573ee9bd4eb411f193519c29764a0d1b -v ./outputs:/app/outputs gnn-pipeline --multirun model.encoder='gine,gcn,gat,sage' data.graph_type='reply'
 ```
 
 ### Step 3: Run PostgreSQL for MLflow
