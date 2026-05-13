@@ -48,40 +48,37 @@ jobs:
 
       - name: Ensure MLflow Server is Running
         run: |
-          # 1. Build the image with auth dependencies if it doesn't exist
-          if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
-            podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
-          fi
+            # 1. Build MLflow auth image
+            if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
+              podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
+            fi
 
-          # 2. Ensure auth_config.ini exists (Auth metadata remains in SQLite for simplicity or can be moved too)
-          if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
-            echo "[mlflow]" > /ipazianas/pasquini/mlflow/auth_config.ini
-            echo "default_permission = READ" >> /ipazianas/pasquini/mlflow/auth_config.ini
-            echo "database_uri = sqlite:///mlflow/auth.db" >> /ipazianas/pasquini/mlflow/auth_config.ini
-            echo "admin_username = ${{ secrets.MLFLOW_AUTH_USER }}" >> /ipazianas/pasquini/mlflow/auth_config.ini
-            echo "admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}" >> /ipazianas/pasquini/mlflow/auth_config.ini
-          fi
+            # 2. Auth config
+            mkdir -p /ipazianas/pasquini/mlflow
+            if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
+              cat <<EOF > /ipazianas/pasquini/mlflow/auth_config.ini
+            [mlflow]
+            default_permission = READ
+            database_uri = sqlite:////mlflow/auth.db
+            admin_username = ***
+            admin_password = ***
+            EOF
+            fi
 
-          # 3. Start the MLflow container with PostgreSQL backend
-          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow_ui$"; then
+            # 3. Run MLflow Server
             podman run -d --name mlflow_ui --replace \
-              -p 5000:5000 \
               --network host \
-              -v /ipazianas/pasquini/mlflow:/mlflow \
+              -v /ipazianas/pasquini/mlflow:/mlflow:Z \
               -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
-              -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
+              -e MLFLOW_FLASK_SERVER_SECRET_KEY="***" \
               -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
               mlflow-auth \
               mlflow server \
-              --app-name basic-auth \
-              --allowed-hosts "*" \
-              --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@127.0.0.1:5432/mlflow_db" \
-              --default-artifact-root /mlflow/artifacts \
-              --host 0.0.0.0
-          # If it exists but is stopped, restart it
-          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow_ui$"; then
-            podman start mlflow_ui
-          fi
+                --app-name basic-auth \
+                --backend-store-uri "postgresql://mlflow:***@127.0.0.1:5432/mlflow_db" \
+                --default-artifact-root /mlflow/artifacts \
+                --host 0.0.0.0 \
+                --port 5000
 
       - name: Run Training Container
         run: |
