@@ -33,16 +33,19 @@ jobs:
       - name: Ensure PostgreSQL is Running
         run: |
           if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
-            podman run -d --name mlflow-db --replace \
-              -p 5432:5432 \
+            # First run: create the container and initialize the DB
+            podman run -d --name mlflow-db \
+              --network host \
               -e POSTGRES_USER=mlflow \
               -e POSTGRES_PASSWORD="${{ secrets.MLFLOW_DB_PASS }}" \
               -e POSTGRES_DB=mlflow_db \
               -v mlflow-pgdata:/var/lib/postgresql/data \
               postgres:15
-            sleep 10
-          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
-            podman start mlflow-db
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 15
+          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow_db$"; then
+            # Container exists but is stopped: restart it, then force-sync the password
+            podman start mlflow_db
             sleep 5
           fi
 
