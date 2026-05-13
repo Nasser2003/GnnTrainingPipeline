@@ -12,7 +12,7 @@ on:
         default: 'config_ipazia'
       run_id:
         description: 'Extraction run_id to train on (overrides value in the config file)'
-        required: false
+        required: true
         default: ''
 
 jobs:
@@ -22,6 +22,15 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set Global Environment Variables
+        run: |
+          # Logique de fallback : Input manuel OR default value
+          INPUT_CONFIG="${{ github.event.inputs.config_name }}"
+          echo "CONFIG_NAME=${INPUT_CONFIG:-config_ipazia}" >> $GITHUB_ENV
+          
+          INPUT_RUN_ID="${{ github.event.inputs.run_id }}"
+          echo "RUN_ID=${INPUT_RUN_ID}" >> $GITHUB_ENV
 
       - name: Build Podman Image
         run: |
@@ -93,48 +102,31 @@ jobs:
 
       - name: Verify Extraction Run ID
         run: |
-          CONFIG_NAME="${{ github.event.inputs.config_name }}"
-          CONFIG_FILE="${{ github.workspace }}/conf/${CONFIG_NAME}.yaml"
-
-          # Use dispatch input if provided, otherwise read from config file
-          DISPATCH_RUN_ID="${{ github.event.inputs.run_id }}"
-          if [ -n "${DISPATCH_RUN_ID}" ]; then
-            RUN_ID="${DISPATCH_RUN_ID}"
-            echo "Using run_id from workflow input: ${RUN_ID}"
-          else
-            RUN_ID=$(grep 'run_id:' "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"')
-            echo "Using run_id from ${CONFIG_NAME}.yaml: ${RUN_ID}"
-          fi
+          DATA_DIR="/ipazianas/pasquini/extraction/outputs/${RUN_ID}"
+          echo "Checking extraction directory: ${DATA_DIR} (config: ${CONFIG_NAME})"
 
           if [ -z "${RUN_ID}" ]; then
-            echo "ERROR: Could not determine run_id. Set it via workflow_dispatch input or in the config file."
+            echo "ERROR: RUN_ID is empty. Provide it via workflow_dispatch input."
             exit 1
           fi
 
-          DATA_DIR="/ipazianas/pasquini/extraction/outputs/${RUN_ID}"
-          echo "Checking extraction directory: ${DATA_DIR}"
-
           if [ ! -d "${DATA_DIR}" ]; then
             echo "ERROR: Extraction directory does not exist: ${DATA_DIR}"
-            echo "Run the extraction workflow first with run_id=${RUN_ID}, or update run_id in ${CONFIG_NAME}.yaml."
+            echo "Run the extraction workflow first with run_id=${RUN_ID}."
             exit 1
           fi
 
           echo "OK — extraction directory found:"
           ls -lh "${DATA_DIR}"
-          echo "RUN_ID=${RUN_ID}" >> "$GITHUB_ENV"
 
       - name: Run Training Container
         run: |
-          # Select the config file to use (dispatch input or 'config' fallback for pushes)
-          CONFIG_NAME="${{ github.event.inputs.config_name }}"
-
           # Collect all GPU devices
           DEVICE_FLAGS=()
           for dev in /dev/nvidia* /dev/nvidia-caps/*; do
             [ -b "$dev" ] || [ -c "$dev" ] && DEVICE_FLAGS+=("--device $dev")
           done
-          
+
           podman run --rm --replace \
             ${DEVICE_FLAGS[@]} \
             --name gnn_training \
@@ -147,7 +139,7 @@ jobs:
             -v ${{ github.workspace }}/conf:/app/conf \
             gnn_training \
             --multirun \
-            --config-name ${CONFIG_NAME}.yaml \
+            --config-name ${CONFIG_NAME} \
             data.run_id="${RUN_ID}" \
             output.output_dir=/app/outputs/models \
             output.graph_dir=/app/outputs/graphs \
