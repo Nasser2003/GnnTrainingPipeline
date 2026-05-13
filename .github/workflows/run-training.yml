@@ -89,10 +89,10 @@ jobs:
           # Select the config file to use (dispatch input or 'config' fallback for pushes)
           CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
 
-          # Collecter tous les devices Nvidia
+          # Collect all GPU devices
           DEVICE_FLAGS=()
           for dev in /dev/nvidia* /dev/nvidia-caps/*; do
-            [ -e "$dev" ] && DEVICE_FLAGS+=("--device $dev")
+            [ -b "$dev" ] || [ -c "$dev" ] && DEVICE_FLAGS+=("--device $dev")
           done
           
           podman run --rm --replace \
