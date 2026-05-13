@@ -70,12 +70,12 @@ jobs:
               --network host \
               -v /ipazianas/pasquini/mlflow:/mlflow:Z \
               -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
-              -e MLFLOW_FLASK_SERVER_SECRET_KEY="***" \
+              -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
               -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
               mlflow-auth \
               mlflow server \
                 --app-name basic-auth \
-                --backend-store-uri "postgresql://mlflow:***@127.0.0.1:5432/mlflow_db" \
+                --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@127.0.0.1:5432/mlflow_db" \
                 --default-artifact-root /mlflow/artifacts \
                 --host 0.0.0.0 \
                 --port 5000
