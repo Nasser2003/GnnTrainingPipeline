@@ -25,7 +25,10 @@ jobs:
 
       - name: Prepare Host Directories
         run: |
-          mkdir -p /ipazianas/pasquini/training/models /ipazianas/pasquini/training/graphs /ipazianas/pasquini/training/logs /ipazianas/pasquini/mlflow/artifacts
+          mkdir -p /ipazianas/pasquini/training/models \
+          /ipazianas/pasquini/training/graphs /ipazianas/pasquini/training/logs \
+          /ipazianas/pasquini/mlflow/artifacts \
+          /ipazianas/pasquini/mlflow/postgres_data
 
       - name: Ensure PostgreSQL is Running
         run: |
