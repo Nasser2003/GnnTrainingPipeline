@@ -38,9 +38,7 @@ jobs:
               -e POSTGRES_USER=mlflow \
               -e POSTGRES_PASSWORD=${{ secrets.MLFLOW_DB_PASS }} \
               -e POSTGRES_DB=mlflow_db \
-              -v /ipazianas/pasquini/mlflow/postgres_data:/var/lib/postgresql/data \
-              postgres:15
-            # Wait for PG to be ready
+              -v mlflow-pgdata:/var/lib/postgresql/data \
             sleep 10
           elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
             podman start mlflow-db
