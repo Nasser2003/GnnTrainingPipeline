@@ -1,3 +1,5 @@
+import mlflow
+
 from evaluation.Evaluator import Evaluator
 from evaluation.GNNScorer import GNNScorer
 
@@ -8,6 +10,7 @@ class GNNEvaluator(Evaluator):
         self.model = model
         self.scorer = GNNScorer(model)
 
+    @mlflow.trace(name="evaluate_gnn")
     def evaluate(self, val_data, test_data, neg_ratios=None,
                  neg_ratio_for_threshold=1, full_pos_edges=None):
         if neg_ratios is None:

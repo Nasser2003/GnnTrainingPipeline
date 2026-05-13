@@ -82,6 +82,7 @@ class Evaluator:
                 
         return best_t
 
+    @mlflow.trace(name="evaluate_metrics")
     def evaluate_metrics_master(self, name, data, neg_ratio, scorer, threshold=0.5, full_pos_edges=None):
         """
         Evaluate link prediction performance with PR-AUC support.
@@ -126,13 +127,13 @@ class Evaluator:
         if mlflow.active_run():
             prefix = f"{name.lower()}_neg{int(neg_ratio)}"
             mlflow.log_metrics({
-                f"{prefix}_f1": f1,
-                f"{prefix}_precision": pr,
-                f"{prefix}_recall": re,
-                f"{prefix}_acc": acc,
-                f"{prefix}_auc": auc_roc,
-                f"{prefix}_ap": ap,
-                f"{prefix}_pr_auc": pr_auc,
+                f"{prefix}_f1": round(f1, 4),
+                f"{prefix}_precision": round(pr, 4),
+                f"{prefix}_recall": round(re, 4),
+                f"{prefix}_acc": round(acc, 4),
+                f"{prefix}_auc": round(auc_roc, 4),
+                f"{prefix}_ap": round(ap, 4),
+                f"{prefix}_pr_auc": round(pr_auc, 4),
             })
 
         return res

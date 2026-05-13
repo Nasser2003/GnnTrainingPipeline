@@ -14,6 +14,8 @@ import pickle
 import sys
 from pathlib import Path
 
+import mlflow
+
 import pandas as pd
 import torch
 from torch_geometric.data import Data
@@ -51,6 +53,7 @@ class GraphBuilder:
                 return path
         return None
 
+    @mlflow.trace(name="build_graph")
     def build_and_save(self) -> str:
         """Build and save the graph as a .pt file. Returns the path to the saved file."""
         output_dir = self.graph_dir
@@ -85,6 +88,9 @@ class GraphBuilder:
         ext = file_path.suffix.lower()
         if ext == '.parquet':
             return pd.read_parquet(file_path)
+        elif ext == '.feather':
+            import pyarrow.feather as feather
+            return feather.read_feather(file_path)
         elif ext == '.pkl':
             with open(file_path, 'rb') as f:
                 data = []
@@ -195,6 +201,18 @@ class GraphBuilder:
         # Normalize weight (first feature column) with log1p / 5.0
         if feat_tensor.size(1) > 0:
             feat_tensor[:, 0] = torch.log1p(feat_tensor[:, 0]) / 5.0
+
+        # --- Structural edge feature: Is Reciprocal (mention only) ---
+        # Computed here (on full graph) rather than during extraction,
+        # because reciprocity requires the complete edge set to be correct.
+        if edge_type == 'mention' and edge_index.size(1) > 0:
+            edge_set = set(zip(edge_index[0].tolist(), edge_index[1].tolist()))
+            is_reciprocal = torch.tensor(
+                [1.0 if (d, s) in edge_set else 0.0
+                 for s, d in zip(edge_index[0].tolist(), edge_index[1].tolist())],
+                dtype=torch.float
+            ).unsqueeze(1)  # [E, 1]
+            feat_tensor = torch.cat([feat_tensor, is_reciprocal], dim=1)
 
         return edge_index, feat_tensor
 

@@ -27,16 +27,53 @@ jobs:
         run: |
           mkdir -p ~/training/models ~/training/graphs ~/training/logs ~/mlflow/artifacts
 
+      - name: Ensure PostgreSQL is Running
+        run: |
+          if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
+            podman run -d --name mlflow-db --replace \
+              -p 5432:5432 \
+              -e POSTGRES_USER=mlflow \
+              -e POSTGRES_PASSWORD=${{ secrets.MLFLOW_DB_PASS }} \
+              -e POSTGRES_DB=mlflow_db \
+              -v ~/mlflow/postgres_data:/var/lib/postgresql/data \
+              postgres:15
+            # Wait for PG to be ready
+            sleep 10
+          elif ! podman ps --format "{{.Names}}" | grep -Eq "^mlflow-db$"; then
+            podman start mlflow-db
+            sleep 5
+          fi
+
       - name: Ensure MLflow Server is Running
         run: |
-          # Start the MLflow container if it doesn't exist
+          # 1. Build the image with auth dependencies if it doesn't exist
+          if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
+            podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
+          fi
+
+          # 2. Ensure auth_config.ini exists (Auth metadata remains in SQLite for simplicity or can be moved too)
+          if [ ! -f ~/mlflow/auth_config.ini ]; then
+            echo "[mlflow]" > ~/mlflow/auth_config.ini
+            echo "default_permission = READ" >> ~/mlflow/auth_config.ini
+            echo "database_uri = sqlite:///mlflow/auth.db" >> ~/mlflow/auth_config.ini
+            echo "admin_username = ${{ secrets.MLFLOW_AUTH_USER }}" >> ~/mlflow/auth_config.ini
+            echo "admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}" >> ~/mlflow/auth_config.ini
+          fi
+
+          # 3. Start the MLflow container with PostgreSQL backend
           if ! podman ps -a --format "{{.Names}}" | grep -Eq "^mlflow_ui$"; then
             podman run -d --name mlflow_ui --replace \
               -p 5000:5000 \
+              --network host \
               -v ~/mlflow:/mlflow \
-              ghcr.io/mlflow/mlflow:v2.10.0 \
+              -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
+              -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
+              -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
+              mlflow-auth \
               mlflow server \
-              --backend-store-uri sqlite:////mlflow/mlflow.db \
+              --app-name basic-auth \
+              --allowed-hosts "*" \
+              --backend-store-uri postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@localhost:5432/mlflow_db \
               --default-artifact-root /mlflow/artifacts \
               --host 0.0.0.0
           # If it exists but is stopped, restart it
@@ -49,23 +86,20 @@ jobs:
           # Select the config file to use (dispatch input or 'config' fallback for pushes)
           CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
 
-          # For Podman GPU passthrough, we use --device nvidia.com/gpu=all (via CDI)
-          # We append `--config-name $CONFIG_NAME` at the end.
-          # Since passing arguments to `podman run` overwrites the Dockerfile's CMD, 
-          # we explicitly pass the data/output paths here to match the mounted volumes.
           podman run --rm --replace \
             --name gnn_training \
             --device nvidia.com/gpu=all \
             --network host \
+            -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
+            -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
+            -e "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_AUTH_PASS }}" \
             -v ~/extraction/output:/data:ro \
             -v ~/training/models:/app/models \
             -v ~/training/graphs:/app/graphs \
             -v ~/training/logs:/app/logs \
-            -v ~/mlflow:/app/mlruns \
             gnn_training \
             --config-name $CONFIG_NAME \
             data.data_dir=/data \
             output.output_dir=/app/models \
             output.graph_dir=/app/graphs \
-            output.log_dir=/app/logs \
-            output.mlflow_tracking_uri=http://localhost:5000
+            output.log_dir=/app/logs

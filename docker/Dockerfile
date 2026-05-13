@@ -22,9 +22,10 @@ COPY conf/ ./conf/
 COPY .git/ ./.git/
 
 ENV DATA_DIR=/app/data
+ENV MLFLOW_TRACKING_URI="http://localhost:5000"
+ENV MLFLOW_TRACKING_USERNAME=""
+ENV MLFLOW_TRACKING_PASSWORD=""
 
-# /app/data    → Source features (from GraphAnalysis)
-# /app/outputs → Training results (models, logs, graphs)
 VOLUME ["/app/data", "/app/outputs"]
 
 ENTRYPOINT ["python", "src/main.py"]

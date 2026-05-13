@@ -1,0 +1,4 @@
+FROM ghcr.io/mlflow/mlflow:latest
+
+# Install required packages for authentication and PostgreSQL connectivity
+RUN pip install --no-cache-dir mlflow[auth] psycopg2-binary

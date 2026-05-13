@@ -1,3 +1,4 @@
+import mlflow
 import torch
 from torch_geometric.loader import LinkNeighborLoader
 from torch_geometric.transforms import RandomLinkSplit
@@ -19,6 +20,7 @@ class GNNDataProcessor:
         self.batch_size = batch_size
         self.num_neighbors = num_neighbors or [10, 5]
 
+    @mlflow.trace(name="prepare_data")
     def prepare_data(self):
         """
         Loads the graph, splits edges, and returns the loaders/data.

@@ -67,6 +67,7 @@ class GNNTraining:
         ])
         return F.binary_cross_entropy_with_logits(scores, labels)
 
+    @mlflow.trace(name="train_gnn")
     def train(self, train_loader, val_data):
         """
         Mini-batch training loop using LinkNeighborLoader.
@@ -169,7 +170,13 @@ class GNNTraining:
 
             # Full-graph Validation
             val_auc = self._evaluate_auc(model, val_data, device)
-            
+
+            with mlflow.start_span(name="epoch") as epoch_span:
+                epoch_span.set_attribute("epoch", epoch)
+                epoch_span.set_attribute("train_loss", round(avg_loss, 6))
+                epoch_span.set_attribute("val_auc", round(val_auc, 6))
+                epoch_span.set_attribute("best_val_auc", round(best_val_auc, 6))
+
             if val_auc > best_val_auc:
                 best_val_auc = val_auc
                 best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -182,9 +189,9 @@ class GNNTraining:
                 lr_scheduler.step(val_auc)
 
             if mlflow.active_run():
-                metrics = {"train_loss": avg_loss, "val_auc": val_auc}
+                metrics = {"train_loss": round(avg_loss, 4), "val_auc": round(val_auc, 4)}
                 if lr_scheduler:
-                    metrics["lr"] = optimizer.param_groups[0]["lr"]
+                    metrics["lr"] = round(optimizer.param_groups[0]["lr"], 6)
                 mlflow.log_metrics(metrics, step=epoch)
 
             if epoch % 10 == 0 or epoch == 1:
@@ -199,7 +206,7 @@ class GNNTraining:
             model.load_state_dict(best_state)
 
         if mlflow.active_run():
-            mlflow.log_metric("best_val_auc", best_val_auc)
+            mlflow.log_metric("best_val_auc", round(best_val_auc, 4))
             mlflow.log_artifact(str(model_path))
 
         return model

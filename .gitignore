@@ -213,3 +213,5 @@ outputs/
 
 # models
 models/
+*.PyInstaller
+*.pt
