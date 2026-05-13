@@ -23,6 +23,11 @@ from utils.gpu_manager import acquire_gpu, release_gpu
 import warnings
 
 warnings.filterwarnings("ignore")
+
+# Silence noisy MLflow warnings
+logging.getLogger("mlflow.pytorch").setLevel(logging.ERROR)
+logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
+
 log = logging.getLogger(__name__)
 
 def set_seed(seed: int) -> None:
