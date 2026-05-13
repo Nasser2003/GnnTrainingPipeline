@@ -35,13 +35,41 @@ def set_seed(seed: int) -> None:
 
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: Config) -> None:
-    # --- Protection : Source folder check ---
+    # --- Pre-flight: verify extraction data directory and required files ---
     data_path = os.path.abspath(cfg.data.data_dir)
+    log.info(f"Checking extraction data directory: {data_path}")
+
     if not os.path.isdir(data_path):
-        log.error(f"Source folder not found : {data_path}")
-        print(f"\n[FATAL ERROR] Source folder not found : {data_path}")
-        print("Ensure GraphAnalysis extraction has been performed.")
-        return
+        raise FileNotFoundError(
+            f"\n[FATAL] Extraction directory not found: {data_path}\n"
+            f"  run_id  : {cfg.data.run_id}\n"
+            f"  base_dir: {cfg.data.base_dir}\n"
+            f"Run the GraphAnalysis extraction workflow first, then update "
+            f"data.run_id in your config (or pass it as a Hydra override)."
+        )
+
+    # Check that key extraction outputs are present
+    REQUIRED_FILES = ["user_features", "edges_retweet", "edges_reply", "edges_mention"]
+    SUPPORTED_EXTS = [".parquet", ".feather", ".csv"]
+    missing = []
+    for fname in REQUIRED_FILES:
+        found = any(
+            os.path.exists(os.path.join(data_path, fname + ext))
+            for ext in SUPPORTED_EXTS
+        )
+        if not found:
+            missing.append(fname)
+
+    if missing:
+        present = os.listdir(data_path)
+        raise FileNotFoundError(
+            f"\n[FATAL] Extraction directory exists but is incomplete: {data_path}\n"
+            f"  Missing files : {missing}\n"
+            f"  Present files : {present}\n"
+            f"The extraction may have failed or is still running."
+        )
+
+    log.info(f"Extraction directory OK — run_id={cfg.data.run_id}")
 
     # --- Load Metadata if exists ---
     metadata = {}

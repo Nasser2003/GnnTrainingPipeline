@@ -10,6 +10,10 @@ on:
         description: 'Hydra config name without extension (e.g., config, config_ipazia)'
         required: true
         default: 'config_ipazia'
+      run_id:
+        description: 'Extraction run_id to train on (overrides value in the config file)'
+        required: false
+        default: ''
 
 jobs:
   train:
@@ -26,9 +30,13 @@ jobs:
       - name: Prepare Host Directories
         run: |
           mkdir -p /ipazianas/pasquini/training/models \
-          /ipazianas/pasquini/training/graphs /ipazianas/pasquini/training/logs \
-          /ipazianas/pasquini/mlflow/artifacts \
-          /ipazianas/pasquini/mlflow/postgres_data
+          /ipazianas/pasquini/training/graphs \
+          /ipazianas/pasquini/training/logs \
+          /ipazianas/pasquini/training/mlflow/artifacts \
+          /ipazianas/pasquini/training/mlflow/postgres_data
+          /ipazianas/pasquini/training/singlerun \
+          /ipazianas/pasquini/training/multirun \
+          /ipazianas/pasquini/training/results \
 
       - name: Ensure PostgreSQL is Running
         run: |
@@ -83,6 +91,39 @@ jobs:
                 --host 0.0.0.0 \
                 --port 5000
 
+      - name: Verify Extraction Run ID
+        run: |
+          CONFIG_NAME="${{ github.event.inputs.config_name || 'config' }}"
+          CONFIG_FILE="${{ github.workspace }}/conf/${CONFIG_NAME}.yaml"
+
+          # Use dispatch input if provided, otherwise read from config file
+          DISPATCH_RUN_ID="${{ github.event.inputs.run_id }}"
+          if [ -n "${DISPATCH_RUN_ID}" ]; then
+            RUN_ID="${DISPATCH_RUN_ID}"
+            echo "Using run_id from workflow input: ${RUN_ID}"
+          else
+            RUN_ID=$(grep 'run_id:' "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"')
+            echo "Using run_id from ${CONFIG_NAME}.yaml: ${RUN_ID}"
+          fi
+
+          if [ -z "${RUN_ID}" ]; then
+            echo "ERROR: Could not determine run_id. Set it via workflow_dispatch input or in the config file."
+            exit 1
+          fi
+
+          DATA_DIR="/ipazianas/pasquini/extraction/outputs/${RUN_ID}"
+          echo "Checking extraction directory: ${DATA_DIR}"
+
+          if [ ! -d "${DATA_DIR}" ]; then
+            echo "ERROR: Extraction directory does not exist: ${DATA_DIR}"
+            echo "Run the extraction workflow first with run_id=${RUN_ID}, or update run_id in ${CONFIG_NAME}.yaml."
+            exit 1
+          fi
+
+          echo "OK — extraction directory found:"
+          ls -lh "${DATA_DIR}"
+          echo "RUN_ID=${RUN_ID}" >> "$GITHUB_ENV"
+
       - name: Run Training Container
         run: |
           # Select the config file to use (dispatch input or 'config' fallback for pushes)
@@ -99,7 +140,7 @@ jobs:
             --name gnn_training \
             --network host \
             -v /ipazianas/pasquini/extraction/outputs:/app/data:ro \
-            -v /ipazianas/pasquini/training/outputs:/app/outputs \
+            -v /ipazianas/pasquini/training:/app/outputs \
             -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
             -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
             -e "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_AUTH_PASS }}" \
@@ -107,7 +148,7 @@ jobs:
             gnn_training \
             --multirun \
             --config-name $CONFIG_NAME \
-            data.data_dir=/app/data \
-            output.output_dir=/app/models \
-            output.graph_dir=/app/graphs \
-            output.log_dir=/app/logs
+            data.run_id="${RUN_ID}" \
+            output.output_dir=/app/outputs/models \
+            output.graph_dir=/app/outputs/graphs \
+            output.log_dir=/app/outputs/logs
