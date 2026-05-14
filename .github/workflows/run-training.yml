@@ -32,7 +32,7 @@ jobs:
           # Logique de fallback : Input manuel OR default value
           INPUT_CONFIG="${{ github.event.inputs.config_name }}"
           echo "CONFIG_NAME=${INPUT_CONFIG:-config_ipazia}" >> $GITHUB_ENV
-          
+
           INPUT_RUN_ID="${{ github.event.inputs.run_id }}"
           echo "RUN_ID=${INPUT_RUN_ID:-$RUN_ID}" >> $GITHUB_ENV
 
@@ -42,70 +42,80 @@ jobs:
 
       - name: Prepare Host Directories
         run: |
-          mkdir -p /ipazianas/pasquini/training/models \
-          mkdir -p /ipazianas/pasquini/training/graphs \
-          mkdir -p /ipazianas/pasquini/training/logs \
-          mkdir -p /ipazianas/pasquini/training/mlflow/artifacts \
+          mkdir -p /ipazianas/pasquini/training/models
+          mkdir -p /ipazianas/pasquini/training/graphs
+          mkdir -p /ipazianas/pasquini/training/logs
+          mkdir -p /ipazianas/pasquini/training/mlflow/artifacts
           mkdir -p /ipazianas/pasquini/training/mlflow/postgres_data
-          mkdir -p /ipazianas/pasquini/training/singlerun \
-          mkdir -p /ipazianas/pasquini/training/multirun \
-          mkdir -p /ipazianas/pasquini/training/results \
-
-      - name: Setup MLflow Network
-        run: |
-          podman network exists mlflow-net || podman network create mlflow-net
+          mkdir -p /ipazianas/pasquini/training/singlerun
+          mkdir -p /ipazianas/pasquini/training/multirun
+          mkdir -p /ipazianas/pasquini/training/results
 
       - name: Ensure PostgreSQL is Running
         run: |
-          # Clean up old host-networked container (data is safe in the volume)
+          # Remove old container if exists, data is safe in the named volume
           podman rm -f mlflow_db 2>/dev/null || true
-          
-          # Run DB in the dedicated network
+
+          # Run PostgreSQL with host network — no rootlessport issues
           podman run -d --name mlflow_db \
-            --network mlflow-net \
+            --network host \
             -e POSTGRES_USER=mlflow \
             -e POSTGRES_PASSWORD="${{ secrets.MLFLOW_DB_PASS }}" \
             -e POSTGRES_DB=mlflow_db \
             -v mlflow-pgdata:/var/lib/postgresql/data \
-            postgres:15
+            docker.io/library/postgres:15
+
+          # Wait until PostgreSQL is actually ready
           echo "Waiting for PostgreSQL to be ready..."
-          sleep 10
+          for i in $(seq 1 20); do
+            podman exec mlflow_db pg_isready -U mlflow && break
+            echo "Attempt $i/20 — retrying in 3s..."
+            /bin/sleep 3
+          done
 
       - name: Ensure MLflow Server is Running
         run: |
-            # 1. Build MLflow auth image
-            if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
-              podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
-            fi
+          # 1. Build MLflow auth image if not present
+          if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
+            podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
+          fi
 
-            # 2. Auth config
-            mkdir -p /ipazianas/pasquini/mlflow
-            if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
-              cat <<EOF > /ipazianas/pasquini/mlflow/auth_config.ini
-            [mlflow]
-            default_permission = READ
-            database_uri = sqlite:////mlflow/auth.db
-            admin_username = ${{ secrets.MLFLOW_AUTH_USER }}
-            admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}
-            EOF
-            fi
+          # 2. Auth config
+          mkdir -p /ipazianas/pasquini/mlflow
+          if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
+            cat <<EOF > /ipazianas/pasquini/mlflow/auth_config.ini
+          [mlflow]
+          default_permission = READ
+          database_uri = sqlite:////mlflow/auth.db
+          admin_username = ${{ secrets.MLFLOW_AUTH_USER }}
+          admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}
+          EOF
+          fi
 
-            # 3. Run MLflow Server
-            podman run -d --name mlflow_ui --replace \
-              --network mlflow-net \
-              -p 5001:5000 \
-              -v /ipazianas/pasquini/mlflow:/mlflow:Z \
-              -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
-              -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
-              -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
-              mlflow-auth \
-              mlflow server \
-                --app-name basic-auth \
-                --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@mlflow_db:5432/mlflow_db" \
-                --default-artifact-root /mlflow/artifacts \
-                --host 0.0.0.0 \
-                --port 5000 \
-                --allowed-hosts "*"
+          # 3. Run MLflow with host network — port directly bound by uvicorn, no rootlessport
+          podman rm -f mlflow_ui 2>/dev/null || true
+          podman run -d --name mlflow_ui \
+            --network host \
+            -v /ipazianas/pasquini/mlflow:/mlflow:Z \
+            -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
+            -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
+            -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
+            mlflow-auth \
+            mlflow server \
+              --app-name basic-auth \
+              --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@localhost:5432/mlflow_db" \
+              --default-artifact-root /mlflow/artifacts \
+              --host 0.0.0.0 \
+              --port 5001 \
+              --allowed-hosts "*"
+
+          # 4. Wait for MLflow to be ready
+          echo "Waiting for MLflow to be ready..."
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:5001/health && break
+            echo "Attempt $i/20 — retrying in 3s..."
+            /bin/sleep 3
+          done
 
       - name: Verify Extraction Run ID
         run: |
@@ -128,7 +138,7 @@ jobs:
 
       - name: Run Training Container
         run: |
-          # Collect all GPU devices
+          # Collect all GPU devices dynamically
           DEVICE_FLAGS=()
           for dev in /dev/nvidia* /dev/nvidia-caps/*; do
             [ -b "$dev" ] || [ -c "$dev" ] && DEVICE_FLAGS+=("--device $dev")
