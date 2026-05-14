@@ -1,5 +1,5 @@
 hydra:
-  mode: MULTIRUN
+  mode: RUN
   sweeper:
     params:
       data.graph_type: reply,retweet,mention,late_fuse

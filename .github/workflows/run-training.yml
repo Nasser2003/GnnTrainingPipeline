@@ -17,6 +17,7 @@ on:
 
 jobs:
   train:
+    timeout-minutes: 10080  # 7 days max time to run
     runs-on: self-hosted
     env:
       CONFIG_NAME: config_ipazia                      # overridden at runtime by Set Global Environment Variables
@@ -84,8 +85,8 @@ jobs:
             [mlflow]
             default_permission = READ
             database_uri = sqlite:////mlflow/auth.db
-            admin_username = ***
-            admin_password = ***
+            admin_username = ${{ secrets.MLFLOW_AUTH_USER }}
+            admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}
             EOF
             fi
 
