@@ -108,6 +108,7 @@ jobs:
               --host 0.0.0.0 \
               --port 5001 \
               --allowed-hosts "*"
+              --cors-allowed-origins "*"
 
           # 4. Wait for MLflow to be ready
           echo "Waiting for MLflow to be ready..."
