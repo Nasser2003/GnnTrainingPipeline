@@ -14,7 +14,7 @@ data:
   # Base directory for all extraction runs
   base_dir: /app/data
   # Specific extraction run ID
-  run_id: a6b91cc04ee511f1a18608f1eaf4fe18
+  run_id: f63a692e505d11f1944b08f1eaf4fe18
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}

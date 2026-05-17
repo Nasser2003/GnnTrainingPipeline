@@ -17,11 +17,11 @@ on:
 
 jobs:
   train:
-    timeout-minutes: 10080  # 7 days max time to run
+    timeout-minutes: 50000  # 34 days max time to run
     runs-on: self-hosted
     env:
       CONFIG_NAME: config_ipazia                      # overridden at runtime by Set Global Environment Variables
-      RUN_ID: 'a6b91cc04ee511f1a18608f1eaf4fe18'      # overridden at runtime by Set Global Environment Variables
+      RUN_ID: 'f63a692e505d11f1944b08f1eaf4fe18'      # overridden at runtime by Set Global Environment Variables
 
     steps:
       - name: Checkout Repository
@@ -107,7 +107,7 @@ jobs:
               --default-artifact-root /mlflow/artifacts \
               --host 0.0.0.0 \
               --port 5001 \
-              --allowed-hosts "*"
+              --allowed-hosts "*" \
               --cors-allowed-origins "*"
 
           # 4. Wait for MLflow to be ready
@@ -145,7 +145,7 @@ jobs:
             [ -b "$dev" ] || [ -c "$dev" ] && DEVICE_FLAGS+=("--device $dev")
           done
 
-          podman run --rm --replace \
+          podman run --replace \
             ${DEVICE_FLAGS[@]} \
             --name gnn_training \
             --network host \

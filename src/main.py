@@ -117,26 +117,41 @@ def main(cfg: Config) -> None:
         collection = metadata.get("collection", "unknown")
         users_processed = metadata.get("users_processed", 0)
         extraction_date = metadata.get("date", "unknown")
+        communities_file = metadata.get("communities", None)
+        is_community_run = communities_file is not None
+        print(f"Communities file: {is_community_run}")
+        base_run_name = f"{graph_type}_{encoder_name}"
+        if is_community_run:
+            run_name = f"{base_run_name}_comm"
+        else:
+            run_name = base_run_name
 
-        with mlflow.start_run(run_name=f"{graph_type}_{encoder_name}", tags={
+        with mlflow.start_run(run_name=run_name, tags={
             "graph_type": graph_type,
             "encoder": encoder_name,
             "extraction_run_id": str(cfg.data.run_id),
             "mongo_collection": str(collection),
             "users_processed": str(users_processed),
+            "is_community_run": str(is_community_run),
+            "communities_file": str(communities_file) if is_community_run else "None",
         }):
             mlflow.set_tag(
                 "mlflow.note.content",
                 f"GNN link prediction on {graph_type} graph | collection: {collection} | "
-                f"users: {users_processed} | extraction: {extraction_date} | encoder: {encoder_name}"
+                f"users: {users_processed} | extraction: {extraction_date} | encoder: {encoder_name} | "
+                f"mode: {'community (' + str(communities_file) + ')' if is_community_run else 'global'}"
             )
 
             if metadata:
                 meta_df = pd.DataFrame([metadata])
+                dataset_name = f"{collection}"
+                if is_community_run:
+                    dataset_name += "_comm"
+                
                 dataset = mlflow.data.from_pandas(
                     meta_df,
                     source=metadata_path,
-                    name=f"{collection}_{cfg.data.run_id[:8]}",
+                    name=dataset_name,
                 )
                 mlflow.log_input(dataset, context="metadata")
 
@@ -166,22 +181,46 @@ def main(cfg: Config) -> None:
                 pipeline_span.set_attribute("encoder", encoder_name)
                 pipeline_span.set_attribute("collection", collection)
 
-                builder = GraphBuilder(
-                    data_dir=cfg.data.data_dir,
-                    graph_dir=cfg.output.graph_dir,
-                    graph_type=graph_type,
-                    load_graph_if_exists=cfg.data.load_graph_if_exists
-                )
+                if is_community_run:
+                    from preprocess.CommunityGraphBuilder import CommunityGraphBuilder
+                    from preprocess.CommunityGNNDataProcessor import CommunityGNNDataProcessor
+                    builder = CommunityGraphBuilder(
+                        data_dir=cfg.data.data_dir,
+                        graph_dir=cfg.output.graph_dir,
+                        graph_type=graph_type,
+                        load_graph_if_exists=cfg.data.load_graph_if_exists,
+                        min_nodes=cfg.data.get("community_min_nodes", 10),
+                        min_edges=cfg.data.get("community_min_edges", 25)
+                    )
+                else:
+                    builder = GraphBuilder(
+                        data_dir=cfg.data.data_dir,
+                        graph_dir=cfg.output.graph_dir,
+                        graph_type=graph_type,
+                        load_graph_if_exists=cfg.data.load_graph_if_exists
+                    )
                 pt_path = builder.build_and_save()
 
-                processor = GNNDataProcessor(
-                    pt_path,
-                    train_ratio=cfg.data.split[0],
-                    val_ratio=cfg.data.split[1],
-                    test_ratio=cfg.data.split[2],
-                    batch_size=cfg.model.batch_size,
-                    num_neighbors=list(cfg.model.num_neighbors),
-                )
+                if is_community_run:
+                    processor = CommunityGNNDataProcessor(
+                        pt_path,
+                        train_ratio=cfg.data.split[0],
+                        val_ratio=cfg.data.split[1],
+                        test_ratio=cfg.data.split[2],
+                        batch_size=cfg.model.batch_size,
+                        num_neighbors=list(cfg.model.num_neighbors),
+                        graph_split=cfg.data.get("community_graph_split", True),
+                        min_edges_for_split=cfg.data.get("community_min_edges_split", 25)
+                    )
+                else:
+                    processor = GNNDataProcessor(
+                        pt_path,
+                        train_ratio=cfg.data.split[0],
+                        val_ratio=cfg.data.split[1],
+                        test_ratio=cfg.data.split[2],
+                        batch_size=cfg.model.batch_size,
+                        num_neighbors=list(cfg.model.num_neighbors),
+                    )
                 train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim = processor.prepare_data()
 
                 # ---- Baselines ----

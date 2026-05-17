@@ -15,15 +15,15 @@ podman build -t gnn-pipeline -f ./docker/Dockerfile .
 local machine
 ```bash
 podman run \
-  -v ../GraphAnalysis/resources:/app/data \
+  -v ../GraphAnalysis/resources:/GraphAnalysis/resources \
   -v ./outputs:/app/outputs \
   -v ./conf:/app/conf \
-  -e RUN_ID=dfa1ea604ea911f1b8779c29764a0d1b \
+  -e RUN_ID=3035b0d5505111f19c649c29764a0d1b \
   -e "MLFLOW_TRACKING_URI=http://host.containers.internal:5000" \
   -e "MLFLOW_TRACKING_USERNAME=admin" \
   -e "MLFLOW_TRACKING_PASSWORD=password12345" \
   gnn-pipeline \
-  --multirun \
+  # --multirun \
   # model.encoder='gine,gcn,gat,sage' \
   # data.graph_type='reply' \
   # hydra/launcher=joblib \
@@ -42,7 +42,7 @@ podman run --gpus all \
   -e "MLFLOW_TRACKING_USERNAME=admin" \
   -e "MLFLOW_TRACKING_PASSWORD=password12345" \
   gnn-pipeline
-  --multirun
+  # --multirun
   # model.encoder='gine,gcn,gat,sage' \
   # data.graph_type='reply' \
   # hydra/launcher=joblib \
