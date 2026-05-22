@@ -125,19 +125,24 @@ jobs:
 
     steps:
       - name: Download Data from ipazia via SCP
-        if: env.OVERRIDE_DOWNLOAD == 'true'
         run: |
           DEST_DIR="${{ env.LOCAL_EXTRACT_DIR }}/${{ env.RUN_ID }}"
-          echo "Creating local destination directory: ${DEST_DIR}"
-          mkdir -p "${DEST_DIR}"
+          
+          if [ "${{ env.OVERRIDE_DOWNLOAD }}" = "true" ] || [ ! -d "${DEST_DIR}" ] || [ -z "$(ls -A "${DEST_DIR}" 2>/dev/null)" ]; then
+            echo "Data needs to be downloaded (OVERRIDE_DOWNLOAD is true OR local data is missing/empty)."
+            echo "Creating local destination directory: ${DEST_DIR}"
+            mkdir -p "${DEST_DIR}"
 
-          echo "Downloading extraction data for run_id=${{ env.RUN_ID }} from ipazia..."
-          scp -i ${{ env.IPAZIA_SSH_KEY }} -r \
-            ${{ env.IPAZIA_USER }}@${{ env.IPAZIA_HOST }}:${{ env.IPAZIA_EXTRACT_DIR }}/${{ env.RUN_ID }}/ \
-            ${{ env.LOCAL_EXTRACT_DIR }}/
+            echo "Downloading extraction data for run_id=${{ env.RUN_ID }} from ipazia..."
+            scp -i ${{ env.IPAZIA_SSH_KEY }} -r \
+              ${{ env.IPAZIA_USER }}@${{ env.IPAZIA_HOST }}:${{ env.IPAZIA_EXTRACT_DIR }}/${{ env.RUN_ID }}/ \
+              ${{ env.LOCAL_EXTRACT_DIR }}/
 
-          echo "Download complete. Contents:"
-          ls -lh "${DEST_DIR}"
+            echo "Download complete. Contents:"
+            ls -lh "${DEST_DIR}"
+          else
+            echo "Local data already exists at ${DEST_DIR} and OVERRIDE_DOWNLOAD is false. Skipping SCP download."
+          fi
 
       - name: Verify Extraction Run ID
         run: |
