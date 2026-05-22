@@ -33,6 +33,10 @@ env:
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
+  OMP_NUM_THREADS:     2
+  MKL_NUM_THREADS:     2
+  # TEMPORARILY FORCES TO USE CPU (REMOVE THIS SOON!)
+  CUDA_VISIBLE_DEVICES:     ""
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
@@ -198,8 +202,6 @@ jobs:
           MLFLOW_TRACKING_URI:      "http://${{ env.IPAZIA_HOST }}:${{ env.MLFLOW_PORT }}"
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_AUTH_USER }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_AUTH_PASS }}
-          # TEMPORARILY FORCES TO USE CPU (REMOVE THIS SOON!)
-          CUDA_VISIBLE_DEVICES:     ""
         run: |
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda activate ${{ env.CONDA_ENV }}
