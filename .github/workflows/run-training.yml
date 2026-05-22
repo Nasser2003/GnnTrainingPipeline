@@ -34,6 +34,7 @@ env:
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
   PYTHONUNBUFFERED:    "1"
+  GPU_MIN_FREE_RATIO:  "0.99" # Forces to use a free GPU
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 # Minimum fraction of VRAM that must be free to consider a GPU available
-GPU_MIN_FREE_RATIO = float(os.environ.get("GPU_MIN_FREE_RATIO", "0.50"))
+GPU_MIN_FREE_RATIO = float(os.environ.get("GPU_MIN_FREE_RATIO", "0.95"))
 
 
 def _get_free_vram_ratio(gpu_id: int) -> float:
