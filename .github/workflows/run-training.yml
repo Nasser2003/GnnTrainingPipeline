@@ -106,7 +106,9 @@ jobs:
             mlflow server \
               --app-name basic-auth \
               --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@localhost:5432/mlflow_db" \
-              --default-artifact-root /mlflow/artifacts \
+              --serve-artifacts \
+              --artifacts-destination /mlflow/artifacts \
+              --default-artifact-root mlflow-artifacts:/ \
               --host 0.0.0.0 \
               --port ${{ env.MLFLOW_PORT }} \
               --allowed-hosts "*" \
