@@ -4,52 +4,48 @@ on:
   push:
     branches:
       - 'exp/*'
-  workflow_dispatch:
-    inputs:
-      config_name:
-        description: 'Hydra config name without extension (e.g., config, config_ipazia)'
-        required: true
-        default: 'config_ipazia'
-      run_id:
-        description: 'Extraction run_id to train on (overrides value in the config file)'
-        required: true
-        default: ''
+
+# ============================================================================
+# GLOBAL ENVIRONMENT — Edit these values to configure the entire pipeline
+# ============================================================================
+env:
+  # --- Pipeline configuration ---
+  CONFIG_NAME:         'config_ipazia'
+  RUN_ID:              'f63a692e505d11f1944b08f1eaf4fe18'
+  OVERRIDE_DOWNLOAD:   'false'
+
+  # --- ipazia server ---
+  IPAZIA_HOST:         '160.80.10.21'
+  IPAZIA_USER:         'pasquini'
+  IPAZIA_SSH_KEY:      '~/.ssh/id_ed25519_ipazia'
+
+  # --- MLflow ---
+  MLFLOW_PORT:         5001
+
+  # --- Paths on ipazia (MLflow server + source extraction data) ---
+  IPAZIA_MLFLOW_DIR:   '/ipazianas/pasquini/mlflow'
+  IPAZIA_EXTRACT_DIR:  '/ipazianas/pasquini/extraction/outputs'
+
+  # --- Paths on the training runner (local data + outputs) ---
+  LOCAL_EXTRACT_DIR:   '/data/dpasquini/extraction/outputs'
+  LOCAL_TRAINING_DIR:  '/data/dpasquini/training'
+
+  # --- Conda environment name ---
+  CONDA_ENV:           'gnn_training'
 
 jobs:
-  train:
-    timeout-minutes: 50000  # 34 days max time to run
-    runs-on: self-hosted
-    env:
-      CONFIG_NAME: config_ipazia                      # overridden at runtime by Set Global Environment Variables
-      RUN_ID: 'f63a692e505d11f1944b08f1eaf4fe18'      # overridden at runtime by Set Global Environment Variables
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Deploy MLflow + PostgreSQL on the ipazia server
+  # ──────────────────────────────────────────────────────────────────────────
+  mlflow-deploy:
+    name: Deploy MLflow & PostgreSQL (ipazia)
+    timeout-minutes: 15
+    runs-on:
+      - ipazia
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Set Global Environment Variables
-        run: |
-          # Logique de fallback : Input manuel OR default value
-          INPUT_CONFIG="${{ github.event.inputs.config_name }}"
-          echo "CONFIG_NAME=${INPUT_CONFIG:-config_ipazia}" >> $GITHUB_ENV
-
-          INPUT_RUN_ID="${{ github.event.inputs.run_id }}"
-          echo "RUN_ID=${INPUT_RUN_ID:-$RUN_ID}" >> $GITHUB_ENV
-
-      - name: Build Podman Image
-        run: |
-          podman build -t gnn_training -f docker/Dockerfile .
-
-      - name: Prepare Host Directories
-        run: |
-          mkdir -p /ipazianas/pasquini/training/models
-          mkdir -p /ipazianas/pasquini/training/graphs
-          mkdir -p /ipazianas/pasquini/training/logs
-          mkdir -p /ipazianas/pasquini/training/mlflow/artifacts
-          mkdir -p /ipazianas/pasquini/training/mlflow/postgres_data
-          mkdir -p /ipazianas/pasquini/training/singlerun
-          mkdir -p /ipazianas/pasquini/training/multirun
-          mkdir -p /ipazianas/pasquini/training/results
 
       - name: Ensure PostgreSQL is Running
         run: |
@@ -81,9 +77,9 @@ jobs:
           fi
 
           # 2. Auth config
-          mkdir -p /ipazianas/pasquini/mlflow
-          if [ ! -f /ipazianas/pasquini/mlflow/auth_config.ini ]; then
-            cat <<EOF > /ipazianas/pasquini/mlflow/auth_config.ini
+          mkdir -p ${{ env.IPAZIA_MLFLOW_DIR }}
+          if [ ! -f ${{ env.IPAZIA_MLFLOW_DIR }}/auth_config.ini ]; then
+            cat <<EOF > ${{ env.IPAZIA_MLFLOW_DIR }}/auth_config.ini
           [mlflow]
           default_permission = READ
           database_uri = sqlite:////mlflow/auth.db
@@ -96,7 +92,7 @@ jobs:
           podman rm -f mlflow_ui 2>/dev/null || true
           podman run -d --name mlflow_ui \
             --network host \
-            -v /ipazianas/pasquini/mlflow:/mlflow:Z \
+            -v ${{ env.IPAZIA_MLFLOW_DIR }}:/mlflow:Z \
             -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
             -e MLFLOW_FLASK_SERVER_SECRET_KEY="${{ secrets.MLFLOW_AUTH_KEY }}" \
             -e MLFLOW_HTTP_ALLOW_ALL_HOSTS=true \
@@ -106,21 +102,46 @@ jobs:
               --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@localhost:5432/mlflow_db" \
               --default-artifact-root /mlflow/artifacts \
               --host 0.0.0.0 \
-              --port 5001 \
+              --port ${{ env.MLFLOW_PORT }} \
               --allowed-hosts "*" \
               --cors-allowed-origins "*"
 
           # 4. Wait for MLflow to be ready
           echo "Waiting for MLflow to be ready..."
           for i in $(seq 1 20); do
-            curl -sf http://localhost:5001/health && break
+            curl -sf http://localhost:${{ env.MLFLOW_PORT }}/health && break
             echo "Attempt $i/20 — retrying in 3s..."
             /bin/sleep 3
           done
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Download extraction data (optional, runs on training runner)
+  # ──────────────────────────────────────────────────────────────────────────
+  download-data:
+    name: Download Extraction Data (SCP)
+    needs: mlflow-deploy
+    timeout-minutes: 120
+    runs-on: hyperion
+
+    steps:
+      - name: Download Data from ipazia via SCP
+        if: env.OVERRIDE_DOWNLOAD == 'true'
+        run: |
+          DEST_DIR="${{ env.LOCAL_EXTRACT_DIR }}/${{ env.RUN_ID }}"
+          echo "Creating local destination directory: ${DEST_DIR}"
+          mkdir -p "${DEST_DIR}"
+
+          echo "Downloading extraction data for run_id=${{ env.RUN_ID }} from ipazia..."
+          scp -i ${{ env.IPAZIA_SSH_KEY }} -r \
+            ${{ env.IPAZIA_USER }}@${{ env.IPAZIA_HOST }}:${{ env.IPAZIA_EXTRACT_DIR }}/${{ env.RUN_ID }}/ \
+            ${{ env.LOCAL_EXTRACT_DIR }}/
+
+          echo "Download complete. Contents:"
+          ls -lh "${DEST_DIR}"
+
       - name: Verify Extraction Run ID
         run: |
-          DATA_DIR="/ipazianas/pasquini/extraction/outputs/${{ env.RUN_ID }}"
+          DATA_DIR="${{ env.LOCAL_EXTRACT_DIR }}/${{ env.RUN_ID }}"
           echo "Checking extraction directory: ${DATA_DIR} (config: ${{ env.CONFIG_NAME }})"
 
           if [ -z "${{ env.RUN_ID }}" ]; then
@@ -130,36 +151,56 @@ jobs:
 
           if [ ! -d "${DATA_DIR}" ]; then
             echo "ERROR: Extraction directory does not exist: ${DATA_DIR}"
-            echo "Run the extraction workflow first with run_id=${{ env.RUN_ID }}."
+            echo "Hint: set override_download=true to fetch it from ipazia via SCP."
             exit 1
           fi
 
           echo "OK — extraction directory found:"
           ls -lh "${DATA_DIR}"
 
-      - name: Run Training Container
-        run: |
-          # Collect all GPU devices dynamically
-          DEVICE_FLAGS=()
-          for dev in /dev/nvidia* /dev/nvidia-caps/*; do
-            [ -b "$dev" ] || [ -c "$dev" ] && DEVICE_FLAGS+=("--device $dev")
-          done
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 3 — GNN Training (conda env, training runner)
+  # ──────────────────────────────────────────────────────────────────────────
+  gnn-training:
+    name: GNN Training (conda)
+    needs: download-data
+    timeout-minutes: 50000  # 34 days max
+    runs-on: hyperion
 
-          podman run --replace \
-            ${DEVICE_FLAGS[@]} \
-            --name gnn_training \
-            --network host \
-            -v /ipazianas/pasquini/extraction/outputs:/app/data:ro \
-            -v /ipazianas/pasquini/training:/app/outputs \
-            -e "MLFLOW_TRACKING_URI=http://localhost:5001" \
-            -e "MLFLOW_TRACKING_USERNAME=${{ secrets.MLFLOW_AUTH_USER }}" \
-            -e "MLFLOW_TRACKING_PASSWORD=${{ secrets.MLFLOW_AUTH_PASS }}" \
-            -v ${{ github.workspace }}/conf:/app/conf \
-            gnn_training \
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Output Directories
+        run: |
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/models
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/graphs
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/logs
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/singlerun
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/multirun
+          mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/results
+
+      - name: Run GNN Training (conda)
+        env:
+          DATA_DIR:                 ${{ env.LOCAL_EXTRACT_DIR }}
+          MLFLOW_TRACKING_URI:      "http://${{ env.IPAZIA_HOST }}:${{ env.MLFLOW_PORT }}"
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_AUTH_USER }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_AUTH_PASS }}
+          # TEMPORARILY FORCES TO USE CPU (REMOVE THIS SOON!)
+          CUDA_VISIBLE_DEVICES:     ""
+        run: |
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda activate ${{ env.CONDA_ENV }}
+
+          python src/main.py \
             --config-name ${{ env.CONFIG_NAME }} \
             hydra/launcher=joblib \
             hydra.launcher.n_jobs=2 \
+            data.base_dir=${{ env.LOCAL_EXTRACT_DIR }} \
             data.run_id="${{ env.RUN_ID }}" \
-            output.output_dir=/app/outputs/models \
-            output.graph_dir=/app/outputs/graphs \
-            output.log_dir=/app/outputs/logs
+            output.output_dir=${{ env.LOCAL_TRAINING_DIR }}/models \
+            output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
+            output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
+            'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \
+            'hydra.sweep.dir=${{ env.LOCAL_TRAINING_DIR }}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}'
+
