@@ -50,25 +50,33 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
 
         if use_graph_split:
             for g in train_graphs:
-                # 100% of edges used for training message passing and supervision
+                hidden = {k: g[k] for k in list(g.keys()) if ('retweet' in k or 'reply' in k or 'mention' in k)}
+                for k in hidden: delattr(g, k)
                 splitter = RandomLinkSplit(num_val=0.0, num_test=0.0, is_undirected=False, add_negative_train_samples=False, disjoint_train_ratio=0.0)
                 tr_g, _, _ = splitter(g)
+                for k, v in hidden.items(): setattr(tr_g, k, v)
                 train_list.append(tr_g)
 
             for g in val_graphs:
-                # Validation graph: 80% edges for message passing, 20% for evaluation target
+                hidden = {k: g[k] for k in list(g.keys()) if ('retweet' in k or 'reply' in k or 'mention' in k)}
+                for k in hidden: delattr(g, k)
                 splitter = RandomLinkSplit(num_val=self.val_ratio, num_test=0.0, is_undirected=False, add_negative_train_samples=False, disjoint_train_ratio=0.0)
                 _, val_g, _ = splitter(g)
+                for k, v in hidden.items(): setattr(val_g, k, v)
                 val_list.append(val_g)
 
             for g in test_graphs:
-                # Test graph: 80% edges for message passing, 20% for test target
+                hidden = {k: g[k] for k in list(g.keys()) if ('retweet' in k or 'reply' in k or 'mention' in k)}
+                for k in hidden: delattr(g, k)
                 splitter = RandomLinkSplit(num_val=0, num_test=self.test_ratio, is_undirected=False, add_negative_train_samples=False, disjoint_train_ratio=0.0)
                 _, _, te_g = splitter(g)
+                for k, v in hidden.items(): setattr(te_g, k, v)
                 test_list.append(te_g)
         else:
             print(f"  [CommunityDataProcessor] Mode A: Edge-level split per graph enabled.")
             for g in filtered_graphs:
+                hidden = {k: g[k] for k in list(g.keys()) if ('retweet' in k or 'reply' in k or 'mention' in k)}
+                for k in hidden: delattr(g, k)
                 splitter = RandomLinkSplit(
                     num_val=self.val_ratio,
                     num_test=self.test_ratio,
@@ -76,8 +84,11 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
                     add_negative_train_samples=False,
                     disjoint_train_ratio=0.0,
                 )
-                
                 tr_g, v_g, te_g = splitter(g)
+                for k, v in hidden.items(): 
+                    setattr(tr_g, k, v)
+                    setattr(v_g, k, v)
+                    setattr(te_g, k, v)
                 train_list.append(tr_g)
                 val_list.append(v_g)
                 test_list.append(te_g)

@@ -69,7 +69,17 @@ class GNNDataProcessor:
             disjoint_train_ratio=0.0,
         )
         
+        # Hide custom edge attributes to prevent RandomLinkSplit from crashing on them
+        hidden = {k: data[k] for k in list(data.keys()) if ('retweet' in k or 'reply' in k or 'mention' in k)}
+        for k in hidden: delattr(data, k)
+        
         train_data, val_data, test_data = splitter(data)
+        
+        # Restore them
+        for k, v in hidden.items():
+            setattr(train_data, k, v)
+            setattr(val_data, k, v)
+            setattr(test_data, k, v)
         
         print(f"  [DataProcessor] Train edges: {train_data.edge_label_index.size(1)}")
         print(f"  [DataProcessor] Val edges:   {val_data.edge_label_index.size(1)}")
