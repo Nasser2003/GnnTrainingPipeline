@@ -11,7 +11,7 @@ on:
 env:
   # --- Pipeline configuration ---
   CONFIG_NAME:         'config_ipazia'
-  RUN_ID:              'f63a692e505d11f1944b08f1eaf4fe18'
+  RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
 
   # --- ipazia server ---
