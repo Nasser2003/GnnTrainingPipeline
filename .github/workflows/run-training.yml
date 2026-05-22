@@ -122,6 +122,31 @@ jobs:
             /bin/sleep 3
           done
 
+          # 5. Restore any deleted experiments (avoids 'experiment N is deleted' errors)
+          echo "Restoring any deleted MLflow experiments..."
+          curl -sf -X GET \
+            -u "${{ secrets.MLFLOW_AUTH_USER }}:${{ secrets.MLFLOW_AUTH_PASS }}" \
+            "http://localhost:${{ env.MLFLOW_PORT }}/api/2.0/mlflow/experiments/search?view_type=DELETED_ONLY" \
+          | python3 -c "
+import sys, json, urllib.request, urllib.parse, base64
+data = json.load(sys.stdin)
+experiments = data.get('experiments', [])
+creds = base64.b64encode(b'${{ secrets.MLFLOW_AUTH_USER }}:${{ secrets.MLFLOW_AUTH_PASS }}').decode()
+for exp in experiments:
+    eid = exp['experiment_id']
+    req = urllib.request.Request(
+        'http://localhost:${{ env.MLFLOW_PORT }}/api/2.0/mlflow/experiments/restore',
+        data=json.dumps({'experiment_id': eid}).encode(),
+        headers={'Content-Type': 'application/json', 'Authorization': f'Basic {creds}'},
+        method='POST'
+    )
+    try:
+        urllib.request.urlopen(req)
+        print(f'Restored experiment {eid}')
+    except Exception as e:
+        print(f'Could not restore experiment {eid}: {e}')
+" || true
+
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 2 — Download extraction data (optional, runs on training runner)
   # ──────────────────────────────────────────────────────────────────────────

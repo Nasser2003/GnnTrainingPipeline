@@ -106,7 +106,20 @@ def main(cfg: Config) -> None:
         mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", cfg.output.mlflow_tracking_uri)
         mlflow.set_tracking_uri(mlflow_uri)
         log.info("Connecting to MLflow and setting experiment...")
-        mlflow.set_experiment("gnn-link-prediction-v2")
+        experiment_name = "gnn-link-prediction-v2"
+        try:
+            mlflow.set_experiment(experiment_name)
+        except Exception as e:
+            log.warning(f"set_experiment failed ({e}), attempting to recover...")
+            client = mlflow.tracking.MlflowClient()
+            exp = client.get_experiment_by_name(experiment_name)
+            if exp is not None and exp.lifecycle_stage == 'deleted':
+                client.restore_experiment(exp.experiment_id)
+                log.info(f"Restored deleted experiment '{experiment_name}'")
+            elif exp is None:
+                client.create_experiment(experiment_name)
+                log.info(f"Created new experiment '{experiment_name}'")
+            mlflow.set_experiment(experiment_name)
         log.info("MLflow connection successful!")
 
         # --- Hydra multirun gère les combinaisons, plus besoin de boucler sur des dicts ---
