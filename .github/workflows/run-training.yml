@@ -169,13 +169,67 @@ jobs:
           ls -lh "${DATA_DIR}"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # JOB 3 — GNN Training (conda env, training runner)
+  # JOB 3 — Setup Dynamic Matrix To run parallar training job 
+  # ──────────────────────────────────────────────────────────────────────────
+  setup-matrix:
+    name: Setup Dynamic Matrix
+    runs-on: hyperion
+    outputs:
+      encoders: ${{ steps.matrix.outputs.encoders }}
+      graph_types: ${{ steps.matrix.outputs.graph_types }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Parse Hydra Config
+        id: matrix
+        run: |
+          python -c "
+          import os, json, sys
+          config_name = os.environ.get('CONFIG_NAME', 'config_ipazia')
+          conf_path = f'conf/{config_name}.yaml'
+          
+          graph_types = []
+          encoders = []
+          try:
+              with open(conf_path) as f:
+                  for line in f:
+                      if 'data.graph_type:' in line:
+                          val = line.split(':')[1].strip()
+                          graph_types = [x.strip() for x in val.split(',')]
+                      elif 'model.encoder:' in line:
+                          val = line.split(':')[1].strip()
+                          encoders = [x.strip() for x in val.split(',')]
+          except Exception as e:
+              print(f'Error reading config: {e}')
+              sys.exit(1)
+              
+          # Fallbacks if parsing fails
+          if not graph_types: graph_types = ['reply']
+          if not encoders: encoders = ['gcn']
+          
+          print(f'Found Encoders: {encoders}')
+          print(f'Found Graph Types: {graph_types}')
+          
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'graph_types={json.dumps(graph_types)}\n')
+              f.write(f'encoders={json.dumps(encoders)}\n')
+          "
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JOB 4 — GNN Training (conda env, training runner)
   # ──────────────────────────────────────────────────────────────────────────
   gnn-training:
-    name: GNN Training (conda)
-    needs: download-data
+    name: Train (${{ matrix.encoder }} - ${{ matrix.graph_type }})
+    needs: [download-data, setup-matrix]
     timeout-minutes: 50000  # 34 days max
     runs-on: hyperion
+    strategy:
+      fail-fast: false
+      max-parallel: 4  # Matches the 4 GPUs on hyperion to avoid timeouts
+      matrix:
+        encoder: ${{ fromJson(needs.setup-matrix.outputs.encoders) }}
+        graph_type: ${{ fromJson(needs.setup-matrix.outputs.graph_types) }}
 
     steps:
       - name: Checkout Repository
@@ -208,15 +262,14 @@ jobs:
 
           python src/main.py \
             --config-name ${{ env.CONFIG_NAME }} \
-            hydra/launcher=joblib \
-            hydra.launcher.n_jobs=2 \
+            model.encoder=${{ matrix.encoder }} \
+            data.graph_type=${{ matrix.graph_type }} \
             data.base_dir=${{ env.LOCAL_EXTRACT_DIR }} \
             data.run_id="${{ env.RUN_ID }}" \
             output.output_dir=${{ env.LOCAL_TRAINING_DIR }}/models \
             output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
-            'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \
-            'hydra.sweep.dir=${{ env.LOCAL_TRAINING_DIR }}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}'
+            'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}'
 
       - name: Print MLflow Tracking URL
         if: always()
