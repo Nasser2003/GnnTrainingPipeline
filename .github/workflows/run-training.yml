@@ -31,7 +31,7 @@ env:
   LOCAL_TRAINING_DIR:  '/data/dpasquini/training'
 
   # --- Conda environment name ---
-  CONDA_ENV:           'gnn_training'
+  CONDA_ENV:           'hetero_kg'
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
