@@ -14,7 +14,7 @@ data:
   # Base directory for all extraction runs
   base_dir: ../GraphAnalysis/resources
   # Specific extraction run ID
-  run_id: 3035b0d5505111f19c649c29764a0d1b
+  run_id: 9e5ab1a1507f11f1b8329c29764a0d1b
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}

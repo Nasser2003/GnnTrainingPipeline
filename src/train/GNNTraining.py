@@ -125,13 +125,19 @@ class GNNTraining:
                     # 0..batch.num_nodes-1, but custom attributes (edge_index_retweet
                     # etc.) keep their global IDs. We remap them here using a
                     # vectorized lookup table — O(E) instead of O(E*N).
-                    num_global_nodes = batch.n_id.max().item() + 1
+                    max_n_id = batch.n_id.max().item()
+                    for etype in ['retweet', 'reply', 'mention']:
+                        gei = getattr(batch, f'edge_index_{etype}', None)
+                        if gei is not None and gei.size(1) > 0:
+                            max_n_id = max(max_n_id, gei.max().item())
+                            
+                    num_global_nodes = max_n_id + 1
                     lookup = torch.full((num_global_nodes,), -1, dtype=torch.long, device=device)
                     lookup[batch.n_id] = torch.arange(batch.n_id.size(0), device=device)
                     
                     for etype in ['retweet', 'reply', 'mention']:
-                        global_ei = getattr(batch, f'edge_index_{etype}')
-                        if global_ei.size(1) == 0:
+                        global_ei = getattr(batch, f'edge_index_{etype}', None)
+                        if global_ei is None or global_ei.size(1) == 0:
                             continue
                         
                         # Vectorized: remap and filter in one pass
@@ -142,7 +148,7 @@ class GNNTraining:
                         setattr(batch, f'edge_index_{etype}',
                                 torch.stack([local_src[mask], local_dst[mask]]))
                         
-                        ea = getattr(batch, f'edge_attr_{etype}')
+                        ea = getattr(batch, f'edge_attr_{etype}', None)
                         if ea is not None:
                             setattr(batch, f'edge_attr_{etype}', ea[mask])
                 
