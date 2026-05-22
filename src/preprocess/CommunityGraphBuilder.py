@@ -109,16 +109,20 @@ class CommunityGraphBuilder(GraphBuilder):
                         feat_tensor[:, 0] = torch.log1p(feat_tensor[:, 0]) / 5.0
                 else:
                     edge_index = torch.empty((2, 0), dtype=torch.long)
-                    feat_tensor = torch.empty((0, 1), dtype=torch.float)
+                    feat_dim = max(0, len(edf.columns) - 2)
+                    feat_tensor = torch.empty((0, feat_dim), dtype=torch.float)
                 
-                if etype == 'mention' and edge_index.size(1) > 0:
-                    edge_set = set(zip(edge_index[0].tolist(), edge_index[1].tolist()))
-                    is_reciprocal = torch.tensor(
-                        [1.0 if (d, s) in edge_set else 0.0
-                         for s, d in zip(edge_index[0].tolist(), edge_index[1].tolist())],
-                        dtype=torch.float
-                    ).unsqueeze(1)
-                    feat_tensor = torch.cat([feat_tensor, is_reciprocal], dim=1)
+                if etype == 'mention':
+                    if edge_index.size(1) > 0:
+                        edge_set = set(zip(edge_index[0].tolist(), edge_index[1].tolist()))
+                        is_reciprocal = torch.tensor(
+                            [1.0 if (d, s) in edge_set else 0.0
+                             for s, d in zip(edge_index[0].tolist(), edge_index[1].tolist())],
+                            dtype=torch.float
+                        ).unsqueeze(1)
+                        feat_tensor = torch.cat([feat_tensor, is_reciprocal], dim=1)
+                    else:
+                        feat_tensor = torch.empty((0, feat_tensor.size(1) + 1), dtype=torch.float)
                     
                 comm_edges[etype] = (edge_index, feat_tensor)
                 total_edges += edge_index.size(1)
