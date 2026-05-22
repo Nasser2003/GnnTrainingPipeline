@@ -15,14 +15,21 @@ logger = logging.getLogger(__name__)
 LOCK_DIR = os.path.join(tempfile.gettempdir(), 'gpu_locks')
 
 
-def acquire_gpu(retry_interval=10, timeout=3600):
+def acquire_gpu(retry_interval=10, timeout=None):
     """
     Waits for a free GPU and acquires it via a file lock.
 
     :param retry_interval: Seconds between retries.
     :param timeout: Max seconds to wait before raising TimeoutError.
+                    If None, reads from GPU_TIMEOUT environment variable (default: 3600).
     :return: (gpu_id, lock_file_handle)
     """
+    if timeout is None:
+        try:
+            timeout = int(os.environ.get("GPU_TIMEOUT", "3600"))
+        except ValueError:
+            timeout = 3600
+
     if not torch.cuda.is_available():
         logger.warning("No CUDA device available, falling back to CPU.")
         return None, None
@@ -31,7 +38,9 @@ def acquire_gpu(retry_interval=10, timeout=3600):
     n_gpus = torch.cuda.device_count()
     elapsed = 0
 
-    while elapsed < timeout:
+    first_try = True
+    while first_try or elapsed < timeout:
+        first_try = False
         for gpu_id in range(n_gpus):
             lock_path = os.path.join(LOCK_DIR, f'gpu_{gpu_id}.lock')
             f = open(lock_path, 'w')
@@ -48,6 +57,9 @@ def acquire_gpu(retry_interval=10, timeout=3600):
                 return gpu_id, f
             except (IOError, OSError, BlockingIOError):
                 f.close()
+
+        if elapsed >= timeout:
+            break
 
         logger.info(f"All GPUs busy, retrying in {retry_interval}s... ({elapsed}s/{timeout}s)")
         time.sleep(retry_interval)

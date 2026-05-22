@@ -13,6 +13,7 @@ env:
   CONFIG_NAME:         'config_ipazia'
   RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
+  GPU_TIMEOUT:         0
 
   # --- ipazia server ---
   IPAZIA_HOST:         '160.80.10.21'
@@ -185,6 +186,12 @@ jobs:
           mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/multirun
           mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/results
 
+      - name: Install Dependencies (conda)
+        run: |
+          source "$(conda info --base)/etc/profile.d/conda.sh"
+          conda activate ${{ env.CONDA_ENV }}
+          pip install -r requirements.txt
+
       - name: Run GNN Training (conda)
         env:
           DATA_DIR:                 ${{ env.LOCAL_EXTRACT_DIR }}
@@ -196,7 +203,6 @@ jobs:
         run: |
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda activate ${{ env.CONDA_ENV }}
-          pip install -r requirements.txt
 
           python src/main.py \
             --config-name ${{ env.CONFIG_NAME }} \
@@ -209,4 +215,12 @@ jobs:
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
             'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \
             'hydra.sweep.dir=${{ env.LOCAL_TRAINING_DIR }}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}'
+
+      - name: Print MLflow Tracking URL
+        if: always()
+        run: |
+          echo "=========================================================="
+          echo " GNN Training finished! You can access the MLflow UI at:"
+          echo " http://${{ env.IPAZIA_HOST }}:${{ env.MLFLOW_PORT }}"
+          echo "=========================================================="
 
