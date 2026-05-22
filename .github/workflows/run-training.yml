@@ -196,6 +196,7 @@ jobs:
         run: |
           source "$(conda info --base)/etc/profile.d/conda.sh"
           conda activate ${{ env.CONDA_ENV }}
+          pip install -r requirements.txt
 
           python src/main.py \
             --config-name ${{ env.CONFIG_NAME }} \
