@@ -101,17 +101,20 @@ def main(cfg: Config) -> None:
 
     try:
         # --- MLflow Setup ---
+        log.info(f"Setting up MLflow tracking URI: {os.getenv('MLFLOW_TRACKING_URI', cfg.output.mlflow_tracking_uri)}")
         # Read tracking URI from env var first (avoids Hydra URL escaping issues in multirun)
         mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", cfg.output.mlflow_tracking_uri)
         mlflow.set_tracking_uri(mlflow_uri)
+        log.info("Connecting to MLflow and setting experiment...")
         mlflow.set_experiment("gnn-link-prediction")
+        log.info("MLflow connection successful!")
 
         # --- Hydra multirun gère les combinaisons, plus besoin de boucler sur des dicts ---
         graph_type = cfg.data.graph_type
         encoder_name = cfg.model.encoder
         grad_clip = cfg.model.grad_clip if cfg.model.grad_clip != 0.0 else None
 
-        print(f"\n--- Processing Graph: {graph_type.upper()} | Run: {cfg.data.run_id} ---")
+        log.info(f"--- Processing Graph: {graph_type.upper()} | Run: {cfg.data.run_id} ---")
         print(f"    Source: {data_path}")
 
         collection = metadata.get("collection", "unknown")
