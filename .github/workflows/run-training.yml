@@ -33,11 +33,7 @@ env:
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
-  OMP_NUM_THREADS:     2
-  MKL_NUM_THREADS:     2
   PYTHONUNBUFFERED:    "1"
-  # TEMPORARILY FORCES TO USE CPU (REMOVE THIS SOON!)
-  CUDA_VISIBLE_DEVICES:     ""
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
