@@ -13,6 +13,7 @@ env:
   CONFIG_NAME:         'config_ipazia'
   RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
+  EXPERIMENT_NAME:     'gnn-link-prediction-v3'
   GPU_TIMEOUT:         0
 
   # --- ipazia server ---
@@ -269,6 +270,7 @@ jobs:
             output.output_dir=${{ env.LOCAL_TRAINING_DIR }}/models \
             output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
+            output.experiment_name="${{ env.EXPERIMENT_NAME }}" \
             'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}'
 
       - name: Print MLflow Tracking URL

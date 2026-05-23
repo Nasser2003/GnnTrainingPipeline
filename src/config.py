@@ -46,6 +46,7 @@ class OutputConfig:
     log_dir: str
     graph_dir: str
     mlflow_tracking_uri: str
+    experiment_name: str
 
 
 @dataclass

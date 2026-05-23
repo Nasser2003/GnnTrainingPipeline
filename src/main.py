@@ -106,7 +106,7 @@ def main(cfg: Config) -> None:
         mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", cfg.output.mlflow_tracking_uri)
         mlflow.set_tracking_uri(mlflow_uri)
         log.info("Connecting to MLflow and setting experiment...")
-        experiment_name = "gnn-link-prediction-v2"
+        experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", cfg.output.experiment_name)
         try:
             mlflow.set_experiment(experiment_name)
         except Exception as e:
