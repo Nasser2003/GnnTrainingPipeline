@@ -66,20 +66,10 @@ class CommunityGraphBuilder(GraphBuilder):
             uid_to_idx = {uid: i for i, uid in enumerate(uids)}
             num_nodes = len(uid_to_idx)
             
-            # Extract features for this community
-            cols_to_extract = [
-                'total', 'retweets', 'replies', 'original', 'likes',
-                'followers', 'following', 'verified', 'account_date',
-                'n_unique_hashtags', 'n_unique_mentions'
-            ]
-            
-            if 'total' in group.columns:
-                features_raw = group[cols_to_extract].values
-            else:
-                indices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14]
-                features_raw = group.iloc[:, indices].values
-                
-            features = [self._build_feature_vector(row) for row in features_raw]
+            # Extract features for this community using the shared schema
+            cols = [s[0] for s in GraphBuilder.FEATURE_SCHEMA]
+            features_raw = group[cols].values.tolist()
+            features = [GraphBuilder._build_feature_vector(row) for row in features_raw]
             node_features = torch.tensor(features, dtype=torch.float)
 
             # Extract edges for this community

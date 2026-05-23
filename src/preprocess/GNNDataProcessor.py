@@ -99,4 +99,9 @@ class GNNDataProcessor:
             num_workers=0  # Set to >0 if multiprocessing is desired and safe
         )
 
-        return train_data, train_loader, val_data, test_data, full_pos_edges, in_channels, edge_dim
+        # For the standard (non-community) processor, read edge dims from data directly
+        edge_dim_retweet = getattr(data, 'edge_dim_retweet', 0)
+        edge_dim_reply   = getattr(data, 'edge_dim_reply',   0)
+        edge_dim_mention = getattr(data, 'edge_dim_mention', 0)
+
+        return train_data, train_loader, val_data, test_data, full_pos_edges, in_channels, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention

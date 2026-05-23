@@ -106,6 +106,49 @@ class GraphBuilder:
     # ----------------------------------------------------------------
     # Node features
     # ----------------------------------------------------------------
+
+    # Feature schema: (column_name, divisor)
+    # Values marked with [L] are already log1p-scaled by the extraction pipeline.
+    # We only divide by a constant to bring them to roughly [0, 1].
+    FEATURE_SCHEMA = [
+        # Activity  [L = already log1p at extraction]
+        ('total',                      10.0),   # [L]
+        ('retweets',                   10.0),   # [L]
+        ('replies',                    10.0),   # [L]
+        ('original',                   10.0),   # [L]
+        # Profile
+        ('likes',                      15.0),   # [L]
+        ('followers',                  15.0),   # [L]
+        ('following',                  12.0),   # [L]
+        ('verified',                    1.0),   # binary
+        ('account_date',          7.0e8),       # seconds since 2006 epoch (~630M in 2026, covers 2006-2029)
+        ('listed_count',               10.0),   # [L]
+        ('reputation_score',            1.0),   # already [0, 1]
+        # Content
+        ('n_unique_hashtags',         100.0),   # raw count
+        ('n_unique_mentions',         100.0),   # raw count
+        ('n_hashtags_total',           10.0),   # [L]
+        ('hashtag_entropy',             4.0),   # entropy [0, ~4]
+        # Automation signals
+        ('activation_age',             15.0),   # [L] seconds
+        ('tweet_regularity_score',     10.0),   # [L]
+        ('regularity_reliable',         1.0),   # binary
+        ('tweet_avg_interval_seconds', 15.0),   # [L]
+        ('daily_score',                 1.0),   # [0, 1]
+        ('daily_cv_log',                5.0),   # [0, ~5]
+        ('internal_tweet_density',      1.0),   # [0, 1]
+        # Flags
+        ('profile_has_url',             1.0),   # binary
+        ('geo_enabled_flag',            1.0),   # binary
+        # Source ratios (all already [0, 1])
+        ('sensitive_rate',              1.0),
+        ('mobile_ratio',                1.0),
+        ('web_ratio',                   1.0),
+        ('news_manager_ratio',          1.0),
+        ('bot_api_ratio',               1.0),
+        ('source_entropy',              3.0),   # log2(4) ≈ 2
+    ]
+
     def _load_user_features(self):
         """Load user features and return (feature_tensor, uid_to_idx mapping)."""
         feat_path = self._find_file('user_features')
@@ -115,43 +158,39 @@ class GraphBuilder:
         print(f"    [GraphBuilder] Loading user features from {feat_path.name}")
         df = self._load_any_format(feat_path)
 
-        # Mapping names if they exist, or using new indices
-        cols_to_extract = [
-            'total', 'retweets', 'replies', 'original', 'likes',
-            'followers', 'following', 'verified', 'account_date',
-            'n_unique_hashtags', 'n_unique_mentions'
-        ]
+        cols = [s[0] for s in self.FEATURE_SCHEMA]
+        missing = [c for c in cols if c not in df.columns]
+        if missing:
+            raise ValueError(
+                f"[GraphBuilder] user_features is missing columns: {missing}\n"
+                f"Available columns: {list(df.columns)}"
+            )
 
-        # Compatibility check: if columns are not named, use indices based on new GraphAnalysis format
-        if not isinstance(df.columns[0], str) or 'user_node_id' not in df.columns:
-            # Fallback to index-based if it's a raw CSV without header
-            # New format indices: 0:uid, 1:total, 2:rt, 3:rep, 4:orig, 5:likes, 6:foll, 7:friends, 8:ver, 9:date, 13:ht, 14:men
-            indices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14]
-            features_raw = df.iloc[:, indices].values
-            uids = df.iloc[:, 0].apply(_parse_uid).values
-        else:
-            features_raw = df[cols_to_extract].values
-            uids = df['user_node_id'].apply(_parse_uid).values
-
+        uids = df['user_node_id'].apply(_parse_uid).values
         uid_to_idx = {uid: i for i, uid in enumerate(uids)}
-        
-        # Apply normalization
+
+        features_raw = df[cols].values.tolist()
+        print(f"    [GraphBuilder] {len(uids)} nodes, {len(cols)} features each")
+
         features = [self._build_feature_vector(row) for row in features_raw]
         node_features = torch.tensor(features, dtype=torch.float)
-        
+
         return node_features, uid_to_idx
 
     @staticmethod
     def _build_feature_vector(raw_values: list) -> list:
-        """Convert raw user stats to feature vector."""
-        # Mapping: total, retweets, replies, original, likes, followers, following, verified, account_date, hashtags, mentions
-        NORMS = [10, 10, 10, 10, 15, 15, 12, 1, 10, 8, 8]
+        """
+        Normalize a feature row. Values already log1p-scaled by extraction
+        are simply divided by their constant to bring them to ~[0, 1].
+        """
+        SCHEMA = GraphBuilder.FEATURE_SCHEMA
         result = []
-        for v, div in zip(raw_values, NORMS):
-            if div == 1:
-                result.append(float(v))
+        for v, (_, div) in zip(raw_values, SCHEMA):
+            fv = float(v) if v is not None and v == v else 0.0  # handle NaN
+            if div == 1.0:
+                result.append(fv)
             else:
-                result.append(math.log1p(max(float(v), 0)) / div)
+                result.append(min(fv / div, 2.0))  # clip at 2.0 for safety
         return result
 
     # ----------------------------------------------------------------

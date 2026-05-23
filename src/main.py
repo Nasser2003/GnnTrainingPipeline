@@ -35,13 +35,13 @@ def set_seed(seed: int) -> None:
 
 @hydra.main(config_path="../conf", config_name="config", version_base=None)
 def main(cfg: Config) -> None:
-    # Re-apply filters inside the worker process (required for joblib multiprocessing)
+    # Remove warnings
     import warnings
     warnings.filterwarnings("ignore")
     logging.getLogger("mlflow.pytorch").setLevel(logging.ERROR)
     logging.getLogger("mlflow.utils.requirements_utils").setLevel(logging.ERROR)
 
-    # --- Pre-flight: verify extraction data directory and required files ---
+    # --- Pre-run: verify extraction data directory and required files ---
     data_path = os.path.abspath(cfg.data.data_dir)
     log.info(f"Checking extraction data directory: {data_path}")
 
@@ -77,7 +77,7 @@ def main(cfg: Config) -> None:
 
     log.info(f"Extraction directory OK — run_id={cfg.data.run_id}")
 
-    # --- Load Metadata if exists ---
+    # --- Load Metadata file {metadata.json} ---
     metadata = {}
     metadata_path = os.path.join(data_path, "metadata.json")
     if os.path.exists(metadata_path):
@@ -122,7 +122,7 @@ def main(cfg: Config) -> None:
             mlflow.set_experiment(experiment_name)
         log.info("MLflow connection successful!")
 
-        # --- Hydra multirun gère les combinaisons, plus besoin de boucler sur des dicts ---
+        # --- Hydra multirun
         graph_type = cfg.data.graph_type
         encoder_name = cfg.model.encoder
         grad_clip = cfg.model.grad_clip if cfg.model.grad_clip != 0.0 else None
@@ -205,8 +205,8 @@ def main(cfg: Config) -> None:
                         graph_dir=cfg.output.graph_dir,
                         graph_type=graph_type,
                         load_graph_if_exists=cfg.data.load_graph_if_exists,
-                        min_nodes=cfg.data.get("community_min_nodes", 10),
-                        min_edges=cfg.data.get("community_min_edges", 25)
+                        min_nodes=cfg.data.get("community_min_nodes", 20),
+                        min_edges=cfg.data.get("community_min_edges", 20)
                     )
                 else:
                     builder = GraphBuilder(
@@ -226,7 +226,7 @@ def main(cfg: Config) -> None:
                         batch_size=cfg.model.batch_size,
                         num_neighbors=list(cfg.model.num_neighbors),
                         graph_split=cfg.data.get("community_graph_split", True),
-                        min_edges_for_split=cfg.data.get("community_min_edges_split", 25)
+                        min_edges_for_split=cfg.data.get("community_min_edges_split", 20)
                     )
                 else:
                     processor = GNNDataProcessor(
@@ -237,10 +237,10 @@ def main(cfg: Config) -> None:
                         batch_size=cfg.model.batch_size,
                         num_neighbors=list(cfg.model.num_neighbors),
                     )
-                train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim = processor.prepare_data()
+                train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
 
-                # ---- Baselines ----
-                if cfg.model.run_baselines:
+                # ---- Baselines (run once per graph_type, not once per encoder) ----
+                if cfg.model.run_baselines and encoder_name == 'gcn':
                     print("\n  >> Evaluating Baselines...")
                     base_evaluator = Evaluator()
 
@@ -259,7 +259,10 @@ def main(cfg: Config) -> None:
                         scorer=mlp_scorer, threshold=0.5,
                         full_pos_edges=full_pos)
                 else:
-                    print("\n  >> Skipping Baselines (run_baselines=false)")
+                    if encoder_name != 'gcn':
+                        print("\n  >> Skipping Baselines (run once per graph_type with gcn encoder)")
+                    else:
+                        print("\n  >> Skipping Baselines (run_baselines=false)")
 
                 # ---- GNN Training + Evaluation ----
                 print(f"\n  >> Training GNN: {encoder_name.upper()}")
@@ -283,9 +286,9 @@ def main(cfg: Config) -> None:
                     grad_clip=grad_clip,
                     fusion=cfg.model.fusion,
                     late_fuse_base_encoder=encoder_name if graph_type == 'late_fuse' else None,
-                    edge_dim_retweet=getattr(train_data, 'edge_dim_retweet', 3),
-                    edge_dim_reply=getattr(train_data, 'edge_dim_reply', 3),
-                    edge_dim_mention=getattr(train_data, 'edge_dim_mention', 3),
+                    edge_dim_retweet=edge_dim_retweet,
+                    edge_dim_reply=edge_dim_reply,
+                    edge_dim_mention=edge_dim_mention,
                     early_stopping_patience=cfg.model.early_stopping_patience,
                 )
 

@@ -10,7 +10,7 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
     def __init__(self, data_path: str, train_ratio: float = 0.70,
                  val_ratio: float = 0.15, test_ratio: float = 0.15,
                  batch_size: int = 512, num_neighbors: list = None,
-                 graph_split: bool = False, min_edges_for_split: int = 50):
+                 graph_split: bool = False, min_edges_for_split: int = 20):
         super().__init__(data_path, train_ratio, val_ratio, test_ratio, batch_size, num_neighbors)
         self.graph_split = graph_split
         self.min_edges_for_split = min_edges_for_split
@@ -93,8 +93,13 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
                 val_list.append(v_g)
                 test_list.append(te_g)
 
-        # Batching using PyTorch Geometric Batch
-        # Batching using PyTorch Geometric Batch
+        # Read per-channel edge dims BEFORE batching (Batch may not preserve scalar attributes)
+        _ref = train_list[0] if train_list else None
+        edge_dim_retweet = getattr(_ref, 'edge_dim_retweet', 7) if _ref else 7
+        edge_dim_reply   = getattr(_ref, 'edge_dim_reply',   7) if _ref else 7
+        edge_dim_mention = getattr(_ref, 'edge_dim_mention', 7) if _ref else 7
+
+        # Batch all community graphs into a single disconnected graph.
         # NOTE: Batch.from_data_list() merges all community graphs into a single
         # disconnected graph. Each community subgraph remains isolated (no edges
         # cross community boundaries), so LinkNeighborLoader will never sample
@@ -106,6 +111,20 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
         val_data = Batch.from_data_list(val_list)
         test_data = Batch.from_data_list(test_list)
 
+        # Remap custom edge indices to the batched node space
+        for batched_data, orig_list in [(train_data, train_list), (val_data, val_list), (test_data, test_list)]:
+            ptr = batched_data.ptr
+            for etype in ['retweet', 'reply', 'mention']:
+                mapped_eis = []
+                for i, g in enumerate(orig_list):
+                    ei = getattr(g, f'edge_index_{etype}', None)
+                    if ei is not None and ei.size(1) > 0:
+                        mapped_eis.append(ei + ptr[i])
+                if mapped_eis:
+                    setattr(batched_data, f'edge_index_{etype}', torch.cat(mapped_eis, dim=1))
+                else:
+                    setattr(batched_data, f'edge_index_{etype}', torch.empty((2, 0), dtype=torch.long))
+
         full_pos_edges = train_data.edge_index.clone()
         
         # Merge full_pos_edges if graph split is false (Mode A) to prevent negative sampling overlaps across splits of the same graph
@@ -114,8 +133,8 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
 
         in_channels = train_data.x.size(1)
 
-        if hasattr(train_data, 'edge_dim_retweet'):
-            edge_dim = 0
+        if hasattr(_ref, 'edge_dim_retweet'):
+            edge_dim = 0  # late_fuse: no single edge_attr
         else:
             edge_dim = train_data.edge_attr.size(1) if train_data.edge_attr is not None else 0
 
@@ -133,4 +152,4 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
             num_workers=0
         )
 
-        return train_data, train_loader, val_data, test_data, full_pos_edges, in_channels, edge_dim
+        return train_data, train_loader, val_data, test_data, full_pos_edges, in_channels, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention

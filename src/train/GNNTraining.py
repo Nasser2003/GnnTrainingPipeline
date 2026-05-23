@@ -213,7 +213,6 @@ class GNNTraining:
 
         if mlflow.active_run():
             mlflow.log_metric("best_val_auc", round(best_val_auc, 4))
-            mlflow.log_artifact(str(model_path))
 
         return model
 
