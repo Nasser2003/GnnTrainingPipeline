@@ -255,7 +255,7 @@ def main(cfg: Config) -> None:
                             scorer=cosine_scorer, threshold=best_thr,
                             full_pos_edges=full_pos
                         )
-                    model = None
+                    model = cosine_scorer
 
                 elif encoder_name == 'mlp':
                     print("\n  >> Running MLP Baseline...")

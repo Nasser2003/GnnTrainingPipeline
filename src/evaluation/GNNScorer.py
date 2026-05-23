@@ -29,7 +29,7 @@ class GNNScorer(BaselineScorer):
                     raise e
                     
             # Batch decoding to prevent OOM
-            batch_size = 100000
+            batch_size = 100_000
             all_scores = []
             for i in range(0, edge_index.size(1), batch_size):
                 batch_ei = edge_index[:, i:i+batch_size].to(z.device)

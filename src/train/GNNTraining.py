@@ -256,7 +256,7 @@ class GNNTraining:
 
         # Batch decoding if edges are too many
         all_scores = []
-        batch_size = 100000
+        batch_size = 100_000
         edge_index = torch.cat([pos, neg], dim=1)
         
         for i in range(0, edge_index.size(1), batch_size):
