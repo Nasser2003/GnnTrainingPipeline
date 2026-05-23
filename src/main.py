@@ -122,6 +122,20 @@ def main(cfg: Config) -> None:
             mlflow.set_experiment(experiment_name)
         log.info("MLflow connection successful!")
 
+        # --- Dynamic check for broken legacy artifact location ---
+        exp = mlflow.get_experiment_by_name(experiment_name)
+        if exp is not None:
+            art_loc = exp.artifact_location
+            if mlflow_uri.startswith("http") and (art_loc.startswith("/") or art_loc.startswith("file:")):
+                log.warning(
+                    f"\n========================================================================\n"
+                    f"[WARNING] MLflow experiment '{experiment_name}' (ID: {exp.experiment_id}) has a local artifact location: '{art_loc}' "
+                    f"but tracking URI is remote: '{mlflow_uri}'.\n"
+                    f"This experiment was created under a legacy configuration and will cause log_model to fail on the runner.\n"
+                    f"RECOMMENDED FIX: Rename your EXPERIMENT_NAME (e.g. to 'gnn-link-prediction-v4') to create a clean experiment.\n"
+                    f"========================================================================\n"
+                )
+
         # --- Hydra multirun
         graph_type = cfg.data.graph_type
         encoder_name = cfg.model.encoder
