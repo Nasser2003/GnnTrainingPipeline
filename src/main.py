@@ -239,73 +239,88 @@ def main(cfg: Config) -> None:
                     )
                 train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
 
-                # ---- Baselines (run once per graph_type, not once per encoder) ----
-                if cfg.model.run_baselines and encoder_name == 'gcn':
-                    print("\n  >> Evaluating Baselines...")
+                # ---- Models & Baselines execution ----
+                if encoder_name == 'cosine':
+                    print("\n  >> Running Cosine Baseline...")
                     base_evaluator = Evaluator()
-
                     cosine_scorer = CosineBaselineScorer()
-                    base_evaluator.evaluate_metrics_master(
-                        "Cosine", test_data, neg_ratio=1.0,
-                        scorer=cosine_scorer, threshold=0.5,
-                        full_pos_edges=full_pos)
+                    
+                    # Evaluate on validation to find the best threshold
+                    best_thr = base_evaluator.find_best_threshold(val_data, neg_ratio=1.0, scorer=cosine_scorer, full_pos_edges=full_pos)
+                    
+                    # Evaluate on test for all neg_ratios
+                    for nr in list(cfg.evaluation.neg_ratios):
+                        base_evaluator.evaluate_metrics_master(
+                            "Cosine", test_data, neg_ratio=nr,
+                            scorer=cosine_scorer, threshold=best_thr,
+                            full_pos_edges=full_pos
+                        )
+                    model = None
 
+                elif encoder_name == 'mlp':
+                    print("\n  >> Running MLP Baseline...")
+                    base_evaluator = Evaluator()
                     mlp_model = RawMLPConcatPredictor(in_dim=in_ch, hidden=cfg.model.hidden_dim)
                     mlp_trainer = BaselineTrainer(mlp_model, lr=cfg.model.learning_rate)
                     trained_mlp = mlp_trainer.train(train_data, val_data, epochs=cfg.model.num_epochs)
                     mlp_scorer = MLPBaselineScorer(trained_mlp)
-                    base_evaluator.evaluate_metrics_master(
-                        "MLP", test_data, neg_ratio=1.0,
-                        scorer=mlp_scorer, threshold=0.5,
-                        full_pos_edges=full_pos)
+                    
+                    # Evaluate on validation to find the best threshold
+                    best_thr = base_evaluator.find_best_threshold(val_data, neg_ratio=1.0, scorer=mlp_scorer, full_pos_edges=full_pos)
+                    
+                    # Evaluate on test for all neg_ratios
+                    for nr in list(cfg.evaluation.neg_ratios):
+                        base_evaluator.evaluate_metrics_master(
+                            "MLP", test_data, neg_ratio=nr,
+                            scorer=mlp_scorer, threshold=best_thr,
+                            full_pos_edges=full_pos
+                        )
+                    model = trained_mlp
+
                 else:
-                    if encoder_name != 'gcn':
-                        print("\n  >> Skipping Baselines (run once per graph_type with gcn encoder)")
-                    else:
-                        print("\n  >> Skipping Baselines (run_baselines=false)")
+                    # ---- GNN Training + Evaluation ----
+                    print(f"\n  >> Training GNN: {encoder_name.upper()}")
 
-                # ---- GNN Training + Evaluation ----
-                print(f"\n  >> Training GNN: {encoder_name.upper()}")
+                    trainer = GNNTraining(
+                        output_dir=cfg.output.output_dir,
+                        encoder='late-fuse' if graph_type == 'late_fuse' else encoder_name,
+                        decoder=cfg.model.decoder,
+                        in_channels=in_ch,
+                        hidden_dim=cfg.model.hidden_dim,
+                        embed_dim=cfg.model.embed_dim,
+                        edge_dim=edge_dim,
+                        learning_rate=cfg.model.learning_rate,
+                        num_epochs=cfg.model.num_epochs,
+                        weight_decay=cfg.model.weight_decay,
+                        dropout=cfg.model.dropout,
+                        neg_ratio=cfg.model.neg_ratio,
+                        decoder_hidden=cfg.model.decoder_hidden,
+                        decoder_dropout=cfg.model.decoder_dropout,
+                        scheduler=cfg.model.scheduler,
+                        grad_clip=grad_clip,
+                        fusion=cfg.model.fusion,
+                        late_fuse_base_encoder=encoder_name if graph_type == 'late_fuse' else None,
+                        edge_dim_retweet=edge_dim_retweet,
+                        edge_dim_reply=edge_dim_reply,
+                        edge_dim_mention=edge_dim_mention,
+                        early_stopping_patience=cfg.model.early_stopping_patience,
+                    )
 
-                trainer = GNNTraining(
-                    output_dir=cfg.output.output_dir,
-                    encoder='late-fuse' if graph_type == 'late_fuse' else encoder_name,
-                    decoder=cfg.model.decoder,
-                    in_channels=in_ch,
-                    hidden_dim=cfg.model.hidden_dim,
-                    embed_dim=cfg.model.embed_dim,
-                    edge_dim=edge_dim,
-                    learning_rate=cfg.model.learning_rate,
-                    num_epochs=cfg.model.num_epochs,
-                    weight_decay=cfg.model.weight_decay,
-                    dropout=cfg.model.dropout,
-                    neg_ratio=cfg.model.neg_ratio,
-                    decoder_hidden=cfg.model.decoder_hidden,
-                    decoder_dropout=cfg.model.decoder_dropout,
-                    scheduler=cfg.model.scheduler,
-                    grad_clip=grad_clip,
-                    fusion=cfg.model.fusion,
-                    late_fuse_base_encoder=encoder_name if graph_type == 'late_fuse' else None,
-                    edge_dim_retweet=edge_dim_retweet,
-                    edge_dim_reply=edge_dim_reply,
-                    edge_dim_mention=edge_dim_mention,
-                    early_stopping_patience=cfg.model.early_stopping_patience,
+                    model = trainer.train(train_loader, val_data)
+
+                    gnn_eval = GNNEvaluator(model=model)
+                    gnn_eval.evaluate(
+                        val_data, test_data,
+                        neg_ratios=list(cfg.evaluation.neg_ratios),
+                        full_pos_edges=full_pos,
+                    )
+
+            if model is not None:
+                mlflow.pytorch.log_model(
+                    model,
+                    name="model",
+                    registered_model_name=encoder_name,
                 )
-
-                model = trainer.train(train_loader, val_data)
-
-                gnn_eval = GNNEvaluator(model=model)
-                gnn_eval.evaluate(
-                    val_data, test_data,
-                    neg_ratios=list(cfg.evaluation.neg_ratios),
-                    full_pos_edges=full_pos,
-                )
-
-            mlflow.pytorch.log_model(
-                model,
-                name="model",
-                registered_model_name=encoder_name,
-            )
 
     finally:
         if gpu_id is not None:

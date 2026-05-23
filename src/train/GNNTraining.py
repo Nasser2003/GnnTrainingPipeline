@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 
 import mlflow
 import torch
@@ -111,6 +112,7 @@ class GNNTraining:
         is_late_fuse = getattr(model, '_is_late_fuse', False)
 
         for epoch in range(1, self.num_epochs + 1):
+            epoch_start = time.time()
             model.train()
             total_loss = 0
             used_batches = 0
@@ -176,12 +178,14 @@ class GNNTraining:
 
             # Full-graph Validation
             val_auc = self._evaluate_auc(model, val_data, device)
+            epoch_duration = time.time() - epoch_start
 
             with mlflow.start_span(name="epoch") as epoch_span:
                 epoch_span.set_attribute("epoch", epoch)
                 epoch_span.set_attribute("train_loss", round(avg_loss, 6))
                 epoch_span.set_attribute("val_auc", round(val_auc, 6))
                 epoch_span.set_attribute("best_val_auc", round(best_val_auc, 6))
+                epoch_span.set_attribute("duration_sec", round(epoch_duration, 2))
 
             if val_auc > best_val_auc:
                 best_val_auc = val_auc
@@ -200,9 +204,10 @@ class GNNTraining:
                     metrics["lr"] = round(optimizer.param_groups[0]["lr"], 6)
                 mlflow.log_metrics(metrics, step=epoch)
 
-            if epoch % 10 == 0 or epoch == 1:
-                lr_str = f" | LR: {optimizer.param_groups[0]['lr']:.6f}" if lr_scheduler else ""
-                print(f"  Epoch {epoch:4d} | Loss: {avg_loss:.4f} | Val AUC: {val_auc:.4f}{lr_str}")
+            # Informative console logging for every single epoch
+            lr_str = f" | LR: {optimizer.param_groups[0]['lr']:.6f}" if self.scheduler else ""
+            patience_str = f" | Patience: {no_improve}/{self.early_stopping_patience}" if self.early_stopping_patience else ""
+            print(f"  Epoch {epoch:4d}/{self.num_epochs:4d} | Loss: {avg_loss:.4f} | Val AUC: {val_auc:.4f} | Best AUC: {best_val_auc:.4f} | Time: {epoch_duration:.2f}s{lr_str}{patience_str}")
 
             if self.early_stopping_patience and no_improve >= self.early_stopping_patience:
                 print(f"  Early stopping triggered at epoch {epoch} (no improvement for {no_improve} epochs).")

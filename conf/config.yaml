@@ -3,7 +3,7 @@ hydra:
   sweeper:
     params:
       data.graph_type: reply,retweet,mention,late_fuse
-      model.encoder: gcn,gat,gatv2,gine,sage,transformer,nnconv
+      model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
     dir: outputs/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
@@ -25,7 +25,6 @@ data:
 model:
   encoder: gine
   decoder: mlp
-  run_baselines: false
   num_epochs: 50
   learning_rate: 0.001
   weight_decay: 1e-5

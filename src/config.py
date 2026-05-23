@@ -17,7 +17,6 @@ class DataConfig:
 class ModelConfig:
     encoder: str
     decoder: str
-    run_baselines: bool
     num_epochs: int
     learning_rate: float
     weight_decay: float
