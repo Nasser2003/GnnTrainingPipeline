@@ -35,12 +35,12 @@ production
 podman run --gpus all \
   --network host \
   -e DATA_DIR=/app/data \
-  -v /ipazianas/pasquini/extraction/outputs:/app/data:ro \
-  -v /ipazianas/pasquini/training/outputs:/app/outputs \
+  -v ${IPAZIA_WORK_DIR}/extraction/outputs:/app/data:ro \
+  -v ${IPAZIA_WORK_DIR}/training/outputs:/app/outputs \
   -v ./conf:/app/conf \
-  -e "MLFLOW_TRACKING_URI=http://localhost:5000" \
-  -e "MLFLOW_TRACKING_USERNAME=admin" \
-  -e "MLFLOW_TRACKING_PASSWORD=password12345" \
+  -e "MLFLOW_TRACKING_URI=http://${IPAZIA_IP}:${MLFLOW_PORT}" \
+  -e "MLFLOW_TRACKING_USERNAME=${MLFLOW_USERNAME}" \
+  -e "MLFLOW_TRACKING_PASSWORD=${MLFLOW_PASSWORD}" \
   gnn-pipeline
   # --multirun
   # model.encoder='gine,gcn,gat,sage' \
@@ -115,7 +115,7 @@ mlflow server --host 0.0.0.0 \
 podman run -d \
  -p 5000:5000 \
  --network host \
- -v /ipazianas/pasquini/training/mlflow:/mlflow \
+ -v ${IPAZIA_WORK_DIR}/mlflow:/mlflow \
  -e MLFLOW_AUTH_CONFIG_PATH=/mlflow/auth_config.ini \
  -e MLFLOW_FLASK_SERVER_SECRET_KEY="your_secret" \
  mlflow-auth \
