@@ -107,7 +107,7 @@ jobs:
               --backend-store-uri "postgresql://mlflow:${{ secrets.MLFLOW_DB_PASS }}@localhost:5432/mlflow_db" \
               --serve-artifacts \
               --artifacts-destination /mlflow/artifacts \
-              --default-artifact-root mlflow-artifacts:/ \
+              --default-artifact-root "http://${{ env.IPAZIA_HOST }}:${{ env.MLFLOW_PORT }}/api/2.0/mlflow-artifacts/artifacts" \
               --host 0.0.0.0 \
               --port ${{ env.MLFLOW_PORT }} \
               --allowed-hosts "*" \
