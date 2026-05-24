@@ -14,7 +14,8 @@ env:
   RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
   EXPERIMENT_NAME:     'gnn-link-prediction-v3'
-  GPU_TIMEOUT:         0
+  GPU_TIMEOUT:         0      # 0 minutes => Will directly use a CPU whenever the GPU is not available,
+                              # 1_000_000 => Will wait until a GPU becomes available
 
   # --- ipazia server ---
   IPAZIA_HOST:         '160.80.10.21'
@@ -34,8 +35,8 @@ env:
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
-  PYTHONUNBUFFERED:    "1"
-  GPU_MIN_FREE_RATIO:  "0.99" # Forces to use a free GPU
+  PYTHONUNBUFFERED:    "1"          # Forces Python to flush stdout/stderr immediately
+  GPU_MIN_FREE_RATIO:  "0.20"       # Forces to use a GPU with at least 20% free memory
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────

@@ -173,6 +173,9 @@ def main(cfg: Config) -> None:
             )
 
             if metadata:
+                if is_community_run and cfg.data.get("max_communities") is not None:
+                    metadata["max_communities"] = cfg.data.max_communities
+
                 meta_df = pd.DataFrame([metadata])
                 dataset_name = f"{collection}"
                 if is_community_run:
@@ -240,7 +243,8 @@ def main(cfg: Config) -> None:
                         batch_size=cfg.model.batch_size,
                         num_neighbors=list(cfg.model.num_neighbors),
                         graph_split=cfg.data.get("community_graph_split", True),
-                        min_edges_for_split=cfg.data.get("community_min_edges_split", 20)
+                        min_edges_for_split=cfg.data.get("community_min_edges_split", 20),
+                        max_communities=cfg.data.get("max_communities", None)
                     )
                 else:
                     processor = GNNDataProcessor(

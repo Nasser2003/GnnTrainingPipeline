@@ -2,8 +2,10 @@ hydra:
   mode: RUN
   sweeper:
     params:
-      data.graph_type: reply,retweet,mention,late_fuse
-      model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
+      data.graph_type: reply
+      model.encoder: gine
+      # data.graph_type: reply,retweet,mention,late_fuse
+      # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
     dir: /app/outputs/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
@@ -21,6 +23,7 @@ data:
   load_graph_if_exists: true
   graph_type: reply
   split: [0.70, 0.15, 0.15]
+  max_communities: 50
 
 model:
   encoder: gine
@@ -30,10 +33,10 @@ model:
   weight_decay: 1e-5
   hidden_dim: 128            # Good for 35 node features (≈4x)
   embed_dim: 64
-  dropout: 0.3               # Slightly higher: many small communities → risk of overfitting
+  dropout: 0.1               # Slightly higher: many small communities → risk of overfitting
   neg_ratio: 3.0             # Was 1.0 — harder negatives help with dense community graphs
   decoder_hidden: 64
-  decoder_dropout: 0.3
+  decoder_dropout: 0.1
   scheduler: true            # Enable LR decay on plateau — important for community graphs
   grad_clip: 1.0             # Enable gradient clipping — small batches can cause spikes
   early_stopping_patience: 15  # Was 10 — more room before stopping

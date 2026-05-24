@@ -117,6 +117,8 @@ class GNNTraining:
             total_loss = 0
             used_batches = 0
             
+            total_batches_str = f"/{len(train_loader)}" if hasattr(train_loader, "__len__") else ""
+            
             for batch in train_loader:
                 batch = batch.to(device)
                 optimizer.zero_grad()
@@ -173,6 +175,10 @@ class GNNTraining:
                 optimizer.step()
                 total_loss += loss.item()
                 used_batches += 1
+                
+                if used_batches % 2 == 0:
+                    elapsed = time.time() - epoch_start
+                    print(f"    [Epoch {epoch:2d} | Batch {used_batches}{total_batches_str}] Current Loss: {loss.item():.4f} | Avg Loss: {(total_loss / used_batches):.4f} | Time: {elapsed:.2f}s")
 
             avg_loss = total_loss / max(used_batches, 1)
 

@@ -21,6 +21,7 @@ data:
   load_graph_if_exists: true
   graph_type: reply
   split: [0.70, 0.15, 0.15]
+  max_communities: 50
 
 model:
   encoder: gine
@@ -30,10 +31,10 @@ model:
   weight_decay: 1e-5
   hidden_dim: 128
   embed_dim: 64
-  dropout: 0.2
+  dropout: 0.1
   neg_ratio: 1.0
   decoder_hidden: 64
-  decoder_dropout: 0.3
+  decoder_dropout: 0.1
   scheduler: false
   grad_clip: 0.0
   early_stopping_patience: 10

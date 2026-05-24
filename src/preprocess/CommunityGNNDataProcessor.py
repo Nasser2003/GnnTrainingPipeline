@@ -10,10 +10,12 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
     def __init__(self, data_path: str, train_ratio: float = 0.70,
                  val_ratio: float = 0.15, test_ratio: float = 0.15,
                  batch_size: int = 512, num_neighbors: list = None,
-                 graph_split: bool = False, min_edges_for_split: int = 20):
+                 graph_split: bool = False, min_edges_for_split: int = 20,
+                 max_communities: int = None):
         super().__init__(data_path, train_ratio, val_ratio, test_ratio, batch_size, num_neighbors)
         self.graph_split = graph_split
         self.min_edges_for_split = min_edges_for_split
+        self.max_communities = max_communities
 
     @mlflow.trace(name="prepare_data_community")
     def prepare_data(self):
@@ -25,6 +27,12 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
         # Filter out graphs that are too small
         filtered_graphs = [g for g in graphs if g.edge_index.size(1) >= self.min_edges_for_split]
         print(f"  [CommunityDataProcessor] Retained {len(filtered_graphs)} graphs with >= {self.min_edges_for_split} edges.")
+
+        if self.max_communities is not None and self.max_communities > 0:
+            # Sort communities by size (number of nodes) ascending
+            filtered_graphs = sorted(filtered_graphs, key=lambda g: getattr(g, 'num_nodes', g.x.size(0)))
+            filtered_graphs = filtered_graphs[:self.max_communities]
+            print(f"  [CommunityDataProcessor] Truncated to {len(filtered_graphs)} smallest communities (max_communities={self.max_communities}).")
 
         if not filtered_graphs:
             raise ValueError(f"No communities have >= {self.min_edges_for_split} edges. Cannot proceed with training.")
