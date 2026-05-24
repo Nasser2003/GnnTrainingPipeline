@@ -241,7 +241,7 @@ jobs:
             output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
             output.experiment_name="${{ env.EXPERIMENT_NAME }}" \
-            'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}'
+            'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \
             'hydra.sweep.dir=${{ env.LOCAL_TRAINING_DIR }}/multirun/${now:%Y-%m-%d}_${now:%H-%M-%S}'
 
       - name: Print MLflow Tracking URL
