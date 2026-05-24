@@ -26,7 +26,7 @@ data:
   max_communities: 100
 
 model:
-  encoder: gine
+  encoder: transformer
   decoder: mlp
   num_epochs: 200            # Was 50 — too short with early_stopping_patience=15
   learning_rate: 0.002
