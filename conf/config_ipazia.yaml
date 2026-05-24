@@ -23,7 +23,7 @@ data:
   load_graph_if_exists: true
   graph_type: reply
   split: [0.70, 0.15, 0.15]
-  max_communities: 200
+  max_communities: 100
 
 model:
   encoder: gine
