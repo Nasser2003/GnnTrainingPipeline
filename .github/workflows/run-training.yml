@@ -44,26 +44,13 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────────
   mlflow-deploy:
     name: Deploy MLflow & PostgreSQL (ipazia)
-    timeout-minutes: 20
+    timeout-minutes: 15
     runs-on:
       - ipazia
 
     steps:
-      - name: Check if MLflow image exists
-        id: check_image
-        run: |
-          podman images --format "{{.Repository}}" | grep -q "mlflow-auth" && \
-          echo "exists=true" >> $GITHUB_OUTPUT || \
-          echo "exists=false" >> $GITHUB_OUTPUT
-
       - name: Checkout Repository
         uses: actions/checkout@v4
-        if: steps.check_image.outputs.exists == 'false'
-        with:
-          fetch-depth: 1
-          clean: false
-          sparse-checkout: |
-            docker/Dockerfile.mlflow
 
       - name: Ensure PostgreSQL is Running
         run: |
