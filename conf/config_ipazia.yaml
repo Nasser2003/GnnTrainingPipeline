@@ -3,7 +3,7 @@ hydra:
   sweeper:
     params:
       data.graph_type: reply
-      model.encoder: gine
+      model.encoder: transformer
       # data.graph_type: reply,retweet,mention,late_fuse
       # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
@@ -26,8 +26,8 @@ data:
   max_communities: 200
 
 model:
-  encoder: transformer
-  decoder: mlp
+  encoder: 
+  decoder: 
   num_epochs: 200            # Was 50 — too short with early_stopping_patience=15
   learning_rate: 0.002
   weight_decay: 1e-5
