@@ -76,8 +76,8 @@ jobs:
 
       - name: Ensure MLflow Server is Running
         run: |
-          # 1. Build MLflow auth image if not present
-          if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
+          # 1. Build MLflow auth image if not present (Podman often prefixes with localhost/)
+          if ! podman images --format "{{.Repository}}" | grep -q "mlflow-auth"; then
             podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
           fi
 
