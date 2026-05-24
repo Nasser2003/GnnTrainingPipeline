@@ -26,12 +26,12 @@ env:
   MLFLOW_PORT:         5001
 
   # --- Paths on ipazia (MLflow server + source extraction data) ---
-  IPAZIA_MLFLOW_DIR:   '${{ vars.IPAZIA_WORK_DIR }}/mlflow'
-  IPAZIA_EXTRACT_DIR:  '${{ vars.IPAZIA_WORK_DIR }}/extraction/outputs'
+  IPAZIA_MLFLOW_DIR:   '/ipazianas/pasquini/mlflow'
+  IPAZIA_EXTRACT_DIR:  '/ipazianas/pasquini/extraction/outputs'
 
   # --- Paths on the training runner (local data + outputs) ---
-  LOCAL_EXTRACT_DIR:   '${{ vars.HYPERION_WORK_DIR }}/extraction/outputs'
-  LOCAL_TRAINING_DIR:  '${{ vars.HYPERION_WORK_DIR }}/training'
+  LOCAL_EXTRACT_DIR:   '/data/hyperion/extraction/outputs'
+  LOCAL_TRAINING_DIR:  '/data/hyperion/training'
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
