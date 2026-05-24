@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 from hydra.core.config_store import ConfigStore
 
 
@@ -12,6 +12,7 @@ class DataConfig:
     load_graph_if_exists: bool
     graph_type: str
     split: List[float]
+    max_communities: Optional[int] = None
 
 @dataclass
 class ModelConfig:
