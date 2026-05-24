@@ -125,15 +125,14 @@ class Evaluator:
               f"AUC={auc_roc:.4f} AP={ap:.4f} PR-AUC={pr_auc:.4f}")
 
         if mlflow.active_run():
-            prefix = f"{name.lower()}_neg{int(neg_ratio)}"
             mlflow.log_metrics({
-                f"{prefix}_f1": round(f1, 4),
-                f"{prefix}_precision": round(pr, 4),
-                f"{prefix}_recall": round(re, 4),
-                f"{prefix}_acc": round(acc, 4),
-                f"{prefix}_auc": round(auc_roc, 4),
-                f"{prefix}_ap": round(ap, 4),
-                f"{prefix}_pr_auc": round(pr_auc, 4),
-            })
+                "f1": round(f1, 4),
+                "precision": round(pr, 4),
+                "recall": round(re, 4),
+                "acc": round(acc, 4),
+                "auc": round(auc_roc, 4),
+                "ap": round(ap, 4),
+                "pr_auc": round(pr_auc, 4),
+            }, step=int(neg_ratio))
 
         return res

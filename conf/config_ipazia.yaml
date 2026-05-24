@@ -2,10 +2,10 @@ hydra:
   mode: RUN
   sweeper:
     params:
-      # data.graph_type: reply
-      # model.encoder: gine
-      data.graph_type: reply,retweet,mention,late_fuse
-      model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
+      data.graph_type: reply
+      model.encoder: gine
+      # data.graph_type: reply,retweet,mention,late_fuse
+      # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
     dir: ${data.base_dir}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
@@ -29,20 +29,20 @@ model:
   encoder: gine
   decoder: mlp
   num_epochs: 200            # Was 50 — too short with early_stopping_patience=15
-  learning_rate: 0.001
-  weight_decay: 1e-5
-  hidden_dim: 128            # Good for 35 node features (≈4x)
-  embed_dim: 64
-  dropout: 0.1               # Slightly higher: many small communities → risk of overfitting
-  neg_ratio: 3.0             # Was 1.0 — harder negatives help with dense community graphs
-  decoder_hidden: 64
-  decoder_dropout: 0.1
+  learning_rate: 0.0005      # Reduced to avoid the massive oscillations in val_auc
+  weight_decay: 5e-4         # Increased for better regularization on small dataset
+  hidden_dim: 64             # Reduced to 64 (closer to the 35 input features) to avoid overfitting
+  embed_dim: 32              # Reduced to 32
+  dropout: 0.4               # Increased to 0.4: tiny communities overfit very quickly
+  neg_ratio: 1.0             # Reduced to 1.0 to balance the BCE loss properly
+  decoder_hidden: 32         # Reduced to 32
+  decoder_dropout: 0.4       # Increased to 0.4
   scheduler: true            # Enable LR decay on plateau — important for community graphs
   grad_clip: 1.0             # Enable gradient clipping — small batches can cause spikes
   early_stopping_patience: 50  # Was 10 — more room before stopping
   seed: 777
   fusion: mean
-  batch_size: 256            # Was 512 — most communities have <100 nodes; smaller batches fit better
+  batch_size: 1024           # Increased significantly to stabilize gradients (your graph is small enough)
   num_neighbors: [15, 10]    # Was [10, 5] — larger fanout for sparse communities
 
 evaluation:
