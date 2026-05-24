@@ -47,9 +47,10 @@ evaluation:
   neg_ratios: [1, 9, 100]
 
 output:
-  output_dir: outputs/models/
-  log_dir: outputs/logs/
-  graph_dir: outputs/graphs/
+  base_dir: outputs
+  output_dir: ${output.base_dir}/models
+  log_dir: ${output.base_dir}/logs
+  graph_dir: ${output.base_dir}/graphs
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///outputs/mlflow/mlflow.db"}
   experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v2"}

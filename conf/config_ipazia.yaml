@@ -1,6 +1,5 @@
 hydra:
-  mode: MULTIRUN
-  # mode: RUN
+  mode: RUN
   sweeper:
     params:
       # data.graph_type: reply
@@ -8,14 +7,14 @@ hydra:
       data.graph_type: reply,retweet,mention,late_fuse
       model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
-    dir: /app/outputs/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    dir: ${data.base_dir}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
-    dir: /app/outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${data.base_dir}/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
 
 data:
   # Base directory for all extraction runs
-  base_dir: /app/data
+  base_dir: extraction/outputs
   # Specific extraction run ID
   run_id: f63a692e505d11f1944b08f1eaf4fe18
   
@@ -50,12 +49,13 @@ evaluation:
   neg_ratios: [1, 9, 100]
 
 output:
-  output_dir: /app/outputs/models
-  log_dir: /app/outputs/logs
-  graph_dir: /app/outputs/graphs
+  base_dir: /app/outputs
+  output_dir: ${output.base_dir}/models
+  log_dir: ${output.base_dir}/logs
+  graph_dir: ${output.base_dir}/graphs
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///app/outputs/mlflow/mlflow.db"}
-  experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v2"}
+  experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v4"}
 
 
 defaults:

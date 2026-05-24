@@ -43,6 +43,7 @@ class EvaluationConfig:
 
 @dataclass
 class OutputConfig:
+    base_dir: str
     output_dir: str
     log_dir: str
     graph_dir: str
