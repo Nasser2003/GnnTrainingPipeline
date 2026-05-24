@@ -44,7 +44,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────────
   mlflow-deploy:
     name: Deploy MLflow & PostgreSQL (ipazia)
-    timeout-minutes: 15
+    timeout-minutes: 20
     runs-on:
       - ipazia
 
@@ -69,7 +69,6 @@ jobs:
         run: |
           # Remove old container if exists, data is safe in the named volume
           podman rm -f mlflow_db 2>/dev/null || true
-
           # Run PostgreSQL with host network — no rootlessport issues
           podman run -d --name mlflow_db \
             --network host \
@@ -78,7 +77,6 @@ jobs:
             -e POSTGRES_DB=mlflow_db \
             -v mlflow-pgdata:/var/lib/postgresql/data \
             docker.io/library/postgres:15
-
           # Wait until PostgreSQL is actually ready
           echo "Waiting for PostgreSQL to be ready..."
           for i in $(seq 1 20); do
@@ -86,14 +84,12 @@ jobs:
             echo "Attempt $i/20 — retrying in 3s..."
             /bin/sleep 3
           done
-
       - name: Ensure MLflow Server is Running
         run: |
           # 1. Build MLflow auth image only if it doesn't exist
           if steps.check_image.outputs.exists == 'false'; then
             podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
           fi
-
           # 2. Auth config
           mkdir -p ${{ env.IPAZIA_MLFLOW_DIR }}
           if [ ! -f ${{ env.IPAZIA_MLFLOW_DIR }}/auth_config.ini ]; then
@@ -105,7 +101,6 @@ jobs:
           admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}
           EOF
           fi
-
           # 3. Run MLflow with host network — port directly bound by uvicorn, no rootlessport
           podman rm -f mlflow_ui 2>/dev/null || true
           podman run -d --name mlflow_ui \
@@ -125,7 +120,6 @@ jobs:
               --port ${{ env.MLFLOW_PORT }} \
               --allowed-hosts "*" \
               --cors-allowed-origins "*"
-
           # 4. Wait for MLflow to be ready
           echo "Waiting for MLflow to be ready..."
           for i in $(seq 1 20); do
@@ -199,7 +193,7 @@ jobs:
       - name: Parse Hydra Config
         id: matrix
         run: python .github/scripts/parse_matrix.py
-        
+
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 4 — GNN Training (conda env, training runner)
   # ──────────────────────────────────────────────────────────────────────────
