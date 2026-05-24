@@ -150,13 +150,17 @@ def main(cfg: Config) -> None:
         communities_file = metadata.get("communities", None)
         is_community_run = communities_file is not None
         print(f"Communities file: {is_community_run}")
+        max_comm = getattr(cfg.data, "max_communities", None)
+        
         base_run_name = f"{graph_type}_{encoder_name}"
         if is_community_run:
             run_name = f"{base_run_name}_comm"
+            if max_comm is not None:
+                run_name += f"_{max_comm}"
         else:
             run_name = base_run_name
 
-        with mlflow.start_run(run_name=run_name, tags={
+        tags = {
             "graph_type": graph_type,
             "encoder": encoder_name,
             "extraction_run_id": str(cfg.data.run_id),
@@ -164,22 +168,31 @@ def main(cfg: Config) -> None:
             "users_processed": str(users_processed),
             "is_community_run": str(is_community_run),
             "communities_file": str(communities_file) if is_community_run else "None",
-        }):
-            mlflow.set_tag(
-                "mlflow.note.content",
+        }
+        if is_community_run and max_comm is not None:
+            tags["max_communities"] = str(max_comm)
+
+        with mlflow.start_run(run_name=run_name, tags=tags):
+            note = (
                 f"GNN link prediction on {graph_type} graph | collection: {collection} | "
                 f"users: {users_processed} | extraction: {extraction_date} | encoder: {encoder_name} | "
                 f"mode: {'community (' + str(communities_file) + ')' if is_community_run else 'global'}"
             )
+            if is_community_run and max_comm is not None:
+                note += f" | max_communities: {max_comm}"
+                
+            mlflow.set_tag("mlflow.note.content", note)
 
             if metadata:
-                if is_community_run and cfg.data.get("max_communities") is not None:
-                    metadata["max_communities"] = cfg.data.max_communities
+                if is_community_run and max_comm is not None:
+                    metadata["max_communities"] = max_comm
 
                 meta_df = pd.DataFrame([metadata])
                 dataset_name = f"{collection}"
                 if is_community_run:
                     dataset_name += "_comm"
+                    if max_comm is not None:
+                        dataset_name += f"_{max_comm}"
                 
                 dataset = mlflow.data.from_pandas(
                     meta_df,
