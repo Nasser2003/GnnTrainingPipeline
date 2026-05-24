@@ -42,7 +42,7 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 1 — Deploy MLflow + PostgreSQL on the ipazia server
   # ──────────────────────────────────────────────────────────────────────────
-mlflow-deploy:
+  mlflow-deploy:
     name: Deploy MLflow & PostgreSQL (ipazia)
     timeout-minutes: 15
     runs-on:
@@ -133,6 +133,7 @@ mlflow-deploy:
             echo "Attempt $i/20 — retrying in 3s..."
             /bin/sleep 3
           done
+
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 2 — Download extraction data (optional, runs on training runner)
   # ──────────────────────────────────────────────────────────────────────────
@@ -181,6 +182,7 @@ mlflow-deploy:
 
           echo "OK — extraction directory found:"
           ls -lh "${DATA_DIR}"
+
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 3 — Setup Dynamic Matrix To run parallar training job 
   # ──────────────────────────────────────────────────────────────────────────
@@ -197,6 +199,7 @@ mlflow-deploy:
       - name: Parse Hydra Config
         id: matrix
         run: python .github/scripts/parse_matrix.py
+        
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 4 — GNN Training (conda env, training runner)
   # ──────────────────────────────────────────────────────────────────────────
