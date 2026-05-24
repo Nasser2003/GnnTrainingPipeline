@@ -42,15 +42,28 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 1 — Deploy MLflow + PostgreSQL on the ipazia server
   # ──────────────────────────────────────────────────────────────────────────
-  mlflow-deploy:
+mlflow-deploy:
     name: Deploy MLflow & PostgreSQL (ipazia)
     timeout-minutes: 15
     runs-on:
       - ipazia
- 
+
     steps:
+      - name: Check if MLflow image exists
+        id: check_image
+        run: |
+          podman images --format "{{.Repository}}" | grep -q "mlflow-auth" && \
+          echo "exists=true" >> $GITHUB_OUTPUT || \
+          echo "exists=false" >> $GITHUB_OUTPUT
+
       - name: Checkout Repository
         uses: actions/checkout@v4
+        if: steps.check_image.outputs.exists == 'false'
+        with:
+          fetch-depth: 1
+          clean: false
+          sparse-checkout: |
+            docker/Dockerfile.mlflow
 
       - name: Ensure PostgreSQL is Running
         run: |
@@ -76,8 +89,8 @@ jobs:
 
       - name: Ensure MLflow Server is Running
         run: |
-          # 1. Build MLflow auth image if not present (Podman often prefixes with localhost/)
-          if ! podman images --format "{{.Repository}}" | grep -q "mlflow-auth"; then
+          # 1. Build MLflow auth image only if it doesn't exist
+          if steps.check_image.outputs.exists == 'false'; then
             podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
           fi
 
@@ -120,7 +133,6 @@ jobs:
             echo "Attempt $i/20 — retrying in 3s..."
             /bin/sleep 3
           done
-
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 2 — Download extraction data (optional, runs on training runner)
   # ──────────────────────────────────────────────────────────────────────────
@@ -169,7 +181,6 @@ jobs:
 
           echo "OK — extraction directory found:"
           ls -lh "${DATA_DIR}"
-
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 3 — Setup Dynamic Matrix To run parallar training job 
   # ──────────────────────────────────────────────────────────────────────────
@@ -186,7 +197,6 @@ jobs:
       - name: Parse Hydra Config
         id: matrix
         run: python .github/scripts/parse_matrix.py
-
   # ──────────────────────────────────────────────────────────────────────────
   # JOB 4 — GNN Training (conda env, training runner)
   # ──────────────────────────────────────────────────────────────────────────
