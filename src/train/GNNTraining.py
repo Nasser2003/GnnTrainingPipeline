@@ -176,7 +176,7 @@ class GNNTraining:
                 total_loss += loss.item()
                 used_batches += 1
                 
-                if used_batches % 2 == 0:
+                if used_batches % 50 == 0:
                     elapsed = time.time() - epoch_start
                     print(f"    [Epoch {epoch:2d} | Batch {used_batches}{total_batches_str}] Current Loss: {loss.item():.4f} | Avg Loss: {(total_loss / used_batches):.4f} | Time: {elapsed:.2f}s")
 
