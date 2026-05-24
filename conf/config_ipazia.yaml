@@ -2,10 +2,10 @@ hydra:
   mode: RUN
   sweeper:
     params:
-      # data.graph_type: reply
-      # model.encoder: gine
-      data.graph_type: reply,retweet,mention,late_fuse
-      model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
+      data.graph_type: reply
+      model.encoder: gine
+      # data.graph_type: reply,retweet,mention,late_fuse
+      # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
     dir: ${data.base_dir}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
@@ -39,7 +39,7 @@ model:
   decoder_dropout: 0.1
   scheduler: true            # Enable LR decay on plateau — important for community graphs
   grad_clip: 1.0             # Enable gradient clipping — small batches can cause spikes
-  early_stopping_patience: 50  # Was 10 — more room before stopping
+  early_stopping_patience: 200  # Was 10 — more room before stopping
   seed: 777
   fusion: mean
   batch_size: 256            # Was 512 — most communities have <100 nodes; smaller batches fit better
