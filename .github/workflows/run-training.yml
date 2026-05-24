@@ -18,20 +18,20 @@ env:
                               # 1_000_000 => Will wait until a GPU becomes available
 
   # --- ipazia server ---
-  IPAZIA_HOST:         '160.80.10.21'
-  IPAZIA_USER:         'pasquini'
-  IPAZIA_SSH_KEY:      '~/.ssh/id_ed25519_ipazia'
+  IPAZIA_HOST:         '${{ vars.IPAZIA_IP }}'
+  IPAZIA_USER:         '${{ vars.IPAZIA_USER }}'
+  IPAZIA_SSH_KEY:      '${{ vars.IPAZIA_SSH_KEY_PATH }}'
 
   # --- MLflow ---
   MLFLOW_PORT:         5001
 
   # --- Paths on ipazia (MLflow server + source extraction data) ---
-  IPAZIA_MLFLOW_DIR:   '/ipazianas/pasquini/mlflow'
-  IPAZIA_EXTRACT_DIR:  '/ipazianas/pasquini/extraction/outputs'
+  IPAZIA_MLFLOW_DIR:   '${{ vars.IPAZIA_WORK_DIR }}/mlflow'
+  IPAZIA_EXTRACT_DIR:  '${{ vars.IPAZIA_WORK_DIR }}/extraction/outputs'
 
   # --- Paths on the training runner (local data + outputs) ---
-  LOCAL_EXTRACT_DIR:   '/data/dpasquini/extraction/outputs'
-  LOCAL_TRAINING_DIR:  '/data/dpasquini/training'
+  LOCAL_EXTRACT_DIR:   '${{ vars.HYPERION_WORK_DIR }}/extraction/outputs'
+  LOCAL_TRAINING_DIR:  '${{ vars.HYPERION_WORK_DIR }}/training'
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
