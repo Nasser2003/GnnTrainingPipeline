@@ -30,8 +30,8 @@ env:
   IPAZIA_EXTRACT_DIR:  '/ipazianas/pasquini/extraction/outputs'
 
   # --- Paths on the training runner (local data + outputs) ---
-  LOCAL_EXTRACT_DIR:   '/data/hyperion/extraction/outputs'
-  LOCAL_TRAINING_DIR:  '/data/hyperion/training'
+  LOCAL_EXTRACT_DIR:   '/data/dpasquini/extraction/outputs'
+  LOCAL_TRAINING_DIR:  '/data/dpasquini/training'
 
   # --- Conda environment name ---
   CONDA_ENV:           'hetero_kg'
