@@ -23,10 +23,10 @@ data:
   load_graph_if_exists: true
   graph_type: reply
   split: [0.70, 0.15, 0.15]
-  max_communities: 100
+  max_communities: 250
 
 model:
-  encoder: gine
+  encoder: none
   decoder: mlp
   num_epochs: 200            # Was 50 — too short with early_stopping_patience=15
   learning_rate: 0.0005      # Reduced to avoid the massive oscillations in val_auc
@@ -52,7 +52,7 @@ output:
   base_dir: /app/outputs
   output_dir: ${output.base_dir}/models
   log_dir: ${output.base_dir}/logs
-  graph_dir: ${output.base_dir}/graphs
+  graph_dir: ${output.base_dir}/graphs/${data.run_id}
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///app/outputs/mlflow/mlflow.db"}
   experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v4"}

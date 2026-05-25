@@ -13,7 +13,7 @@ env:
   CONFIG_NAME:         'config_ipazia'
   RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
-  EXPERIMENT_NAME:     'gnn-link-prediction-v4'
+  EXPERIMENT_NAME:     'gnn-link-prediction-experimentations'
   GPU_TIMEOUT:         0      # 0 minutes => Will directly use a CPU whenever the GPU is not available,
                               # 1_000_000 => Will wait until a GPU becomes available
 
@@ -56,7 +56,6 @@ jobs:
         run: |
           # Remove old container if exists, data is safe in the named volume
           podman rm -f mlflow_db 2>/dev/null || true
-
           # Run PostgreSQL with host network — no rootlessport issues
           podman run -d --name mlflow_db \
             --network host \
@@ -65,7 +64,6 @@ jobs:
             -e POSTGRES_DB=mlflow_db \
             -v mlflow-pgdata:/var/lib/postgresql/data \
             docker.io/library/postgres:15
-
           # Wait until PostgreSQL is actually ready
           echo "Waiting for PostgreSQL to be ready..."
           for i in $(seq 1 20); do
@@ -73,14 +71,12 @@ jobs:
             echo "Attempt $i/20 — retrying in 3s..."
             /bin/sleep 3
           done
-
       - name: Ensure MLflow Server is Running
         run: |
-          # 1. Build MLflow auth image if not present
-          if ! podman images --format "{{.Repository}}" | grep -Eq "^mlflow-auth$"; then
+          # 1. Build MLflow auth image only if it doesn't exist
+          if steps.check_image.outputs.exists == 'false'; then
             podman build -t mlflow-auth -f docker/Dockerfile.mlflow .
           fi
-
           # 2. Auth config
           mkdir -p ${{ env.IPAZIA_MLFLOW_DIR }}
           if [ ! -f ${{ env.IPAZIA_MLFLOW_DIR }}/auth_config.ini ]; then
@@ -92,7 +88,6 @@ jobs:
           admin_password = ${{ secrets.MLFLOW_AUTH_PASS }}
           EOF
           fi
-
           # 3. Run MLflow with host network — port directly bound by uvicorn, no rootlessport
           podman rm -f mlflow_ui 2>/dev/null || true
           podman run -d --name mlflow_ui \
@@ -112,7 +107,6 @@ jobs:
               --port ${{ env.MLFLOW_PORT }} \
               --allowed-hosts "*" \
               --cors-allowed-origins "*"
-
           # 4. Wait for MLflow to be ready
           echo "Waiting for MLflow to be ready..."
           for i in $(seq 1 20); do
@@ -238,7 +232,7 @@ jobs:
             data.base_dir=${{ env.LOCAL_EXTRACT_DIR }} \
             data.run_id="${{ env.RUN_ID }}" \
             output.output_dir=${{ env.LOCAL_TRAINING_DIR }}/models \
-            output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
+            output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs/${{ env.RUN_ID }} \
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
             output.experiment_name="${{ env.EXPERIMENT_NAME }}" \
             'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \
