@@ -232,7 +232,7 @@ jobs:
             data.base_dir=${{ env.LOCAL_EXTRACT_DIR }} \
             data.run_id="${{ env.RUN_ID }}" \
             output.output_dir=${{ env.LOCAL_TRAINING_DIR }}/models \
-            output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs \
+            output.graph_dir=${{ env.LOCAL_TRAINING_DIR }}/graphs/${{ env.RUN_ID }} \
             output.log_dir=${{ env.LOCAL_TRAINING_DIR }}/logs \
             output.experiment_name="${{ env.EXPERIMENT_NAME }}" \
             'hydra.run.dir=${{ env.LOCAL_TRAINING_DIR }}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}' \

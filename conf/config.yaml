@@ -14,32 +14,32 @@ data:
   # Base directory for all extraction runs
   base_dir: ../GraphAnalysis/resources
   # Specific extraction run ID
-  run_id: 9e5ab1a1507f11f1b8329c29764a0d1b
+  run_id: 8cd290e451f511f182c408f1eaf4fe18
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}
   load_graph_if_exists: true
-  graph_type: reply
-  split: [0.70, 0.15, 0.15]
-  max_communities: 50
+  graph_type: late_fuse
+  split: [0.80, 0.10, 0.10]
+  max_communities: 100
 
 model:
   encoder: gine
   decoder: mlp
   num_epochs: 50
-  learning_rate: 0.001
+  learning_rate: 0.0005
   weight_decay: 1e-5
-  hidden_dim: 128
-  embed_dim: 64
+  hidden_dim: 64
+  embed_dim: 32
   dropout: 0.1
-  neg_ratio: 1.0
-  decoder_hidden: 64
+  neg_ratio: 100.0
+  decoder_hidden: 32
   decoder_dropout: 0.1
   scheduler: false
   grad_clip: 0.0
-  early_stopping_patience: 10
+  early_stopping_patience: 20
   seed: 777
-  fusion: mean
+  fusion: concat
   batch_size: 512
   num_neighbors: [10, 5]
 
@@ -50,7 +50,7 @@ output:
   base_dir: outputs
   output_dir: ${output.base_dir}/models
   log_dir: ${output.base_dir}/logs
-  graph_dir: ${output.base_dir}/graphs
+  graph_dir: ${output.base_dir}/graphs/${data.run_id}
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///outputs/mlflow/mlflow.db"}
   experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v2"}
