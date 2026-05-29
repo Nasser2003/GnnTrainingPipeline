@@ -12,6 +12,7 @@ class DataConfig:
     load_graph_if_exists: bool
     graph_type: str
     split: List[float]
+    allow_self_loops: Optional[bool] = False
     max_communities: Optional[int] = None
 
 @dataclass

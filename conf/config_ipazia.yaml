@@ -23,6 +23,7 @@ data:
   load_graph_if_exists: true
   graph_type: reply
   split: [0.70, 0.15, 0.15]
+  allow_self_loops: false
   max_communities: 250
 
 model:

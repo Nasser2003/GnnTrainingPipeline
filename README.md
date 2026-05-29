@@ -5,6 +5,11 @@
 python .\src\main.py model.encoder=gine data.graph_type=reply 
 ```
 
+## Graph visualizer
+```bash
+python visualize_communities.py .\outputs\graphs\8cd290e451f511f182c408f1eaf4fe18\graphs_late_fuse_community.pt
+```
+
 ## Containers:
 ### Step 1: Build the images
 ```bash

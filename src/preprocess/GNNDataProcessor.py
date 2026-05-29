@@ -12,13 +12,14 @@ class GNNDataProcessor:
 
     def __init__(self, data_path: str, train_ratio: float = 0.70,
                  val_ratio: float = 0.15, test_ratio: float = 0.15,
-                 batch_size: int = 512, num_neighbors: list = None):
+                 batch_size: int = 512, num_neighbors: list = None, allow_self_loops: bool = False):
         self.data_path = data_path
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.batch_size = batch_size
         self.num_neighbors = num_neighbors or [10, 5]
+        self.allow_self_loops = allow_self_loops
 
     @mlflow.trace(name="prepare_data")
     def prepare_data(self):
@@ -35,6 +36,24 @@ class GNNDataProcessor:
         """
         print(f"  [DataProcessor] Loading graph from: {self.data_path}")
         data = torch.load(self.data_path, weights_only=False)
+
+        if not self.allow_self_loops:
+            from torch_geometric.utils import remove_self_loops
+            if data.edge_attr is not None:
+                data.edge_index, data.edge_attr = remove_self_loops(data.edge_index, data.edge_attr)
+            else:
+                data.edge_index, _ = remove_self_loops(data.edge_index)
+                
+            for etype in ['retweet', 'reply', 'mention']:
+                ei = getattr(data, f'edge_index_{etype}', None)
+                ea = getattr(data, f'edge_attr_{etype}', None)
+                if ei is not None:
+                    if ea is not None and ea.size(0) == ei.size(1):
+                        ei, ea = remove_self_loops(ei, ea)
+                        setattr(data, f'edge_attr_{etype}', ea)
+                    else:
+                        ei, _ = remove_self_loops(ei)
+                    setattr(data, f'edge_index_{etype}', ei)
 
         # Full positive edges for negative sampling logic during evaluation.
         # This is the COMPLETE edge set before splitting — used to ensure

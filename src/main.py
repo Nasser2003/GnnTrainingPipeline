@@ -8,6 +8,7 @@ import torch
 import hydra
 import mlflow
 import mlflow.pytorch
+import time
 
 from config import Config
 from evaluation.CosineBaselineScorer import CosineBaselineScorer
@@ -168,15 +169,18 @@ def main(cfg: Config) -> None:
             "users_processed": str(users_processed),
             "is_community_run": str(is_community_run),
             "communities_file": str(communities_file) if is_community_run else "None",
+            "allow_self_loops": str(getattr(cfg.data, "allow_self_loops", False)),
         }
         if is_community_run and max_comm is not None:
             tags["max_communities"] = str(max_comm)
 
         with mlflow.start_run(run_name=run_name, tags=tags):
+            run_start_time = time.time()
             note = (
                 f"GNN link prediction on {graph_type} graph | collection: {collection} | "
                 f"users: {users_processed} | extraction: {extraction_date} | encoder: {encoder_name} | "
-                f"mode: {'community (' + str(communities_file) + ')' if is_community_run else 'global'}"
+                f"mode: {'community (' + str(communities_file) + ')' if is_community_run else 'global'} | "
+                f"self_loops: {getattr(cfg.data, 'allow_self_loops', False)}"
             )
             if is_community_run and max_comm is not None:
                 note += f" | max_communities: {max_comm}"
@@ -220,6 +224,7 @@ def main(cfg: Config) -> None:
                 "early_stopping_patience": cfg.model.early_stopping_patience,
                 "batch_size": cfg.model.batch_size,
                 "seed": cfg.model.seed,
+                "allow_self_loops": getattr(cfg.data, "allow_self_loops", False),
             })
 
             with mlflow.start_span(name="pipeline") as pipeline_span:
@@ -257,7 +262,8 @@ def main(cfg: Config) -> None:
                         num_neighbors=list(cfg.model.num_neighbors),
                         graph_split=cfg.data.get("community_graph_split", True),
                         min_edges_for_split=cfg.data.get("community_min_edges_split", 20),
-                        max_communities=cfg.data.get("max_communities", None)
+                        max_communities=cfg.data.get("max_communities", None),
+                        allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
                     )
                 else:
                     processor = GNNDataProcessor(
@@ -267,6 +273,7 @@ def main(cfg: Config) -> None:
                         test_ratio=cfg.data.split[2],
                         batch_size=cfg.model.batch_size,
                         num_neighbors=list(cfg.model.num_neighbors),
+                        allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
                     )
                 train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
 
@@ -352,6 +359,9 @@ def main(cfg: Config) -> None:
                     name="model",
                     registered_model_name=encoder_name,
                 )
+            
+            run_duration = time.time() - run_start_time
+            mlflow.log_metric("Duration", round(run_duration, 2))
 
     finally:
         if gpu_id is not None:
