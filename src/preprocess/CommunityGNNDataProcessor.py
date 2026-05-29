@@ -11,8 +11,8 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
                  val_ratio: float = 0.15, test_ratio: float = 0.15,
                  batch_size: int = 512, num_neighbors: list = None,
                  graph_split: bool = False, min_edges_for_split: int = 20,
-                 max_communities: int = None):
-        super().__init__(data_path, train_ratio, val_ratio, test_ratio, batch_size, num_neighbors)
+                 max_communities: int = None, allow_self_loops: bool = False):
+        super().__init__(data_path, train_ratio, val_ratio, test_ratio, batch_size, num_neighbors, allow_self_loops)
         self.graph_split = graph_split
         self.min_edges_for_split = min_edges_for_split
         self.max_communities = max_communities
@@ -22,6 +22,26 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
         use_graph_split = self.graph_split
         print(f"  [CommunityDataProcessor] Loading graphs from: {self.data_path}")
         graphs = torch.load(self.data_path, weights_only=False)
+        
+        if not self.allow_self_loops:
+            from torch_geometric.utils import remove_self_loops
+            for g in graphs:
+                if g.edge_attr is not None:
+                    g.edge_index, g.edge_attr = remove_self_loops(g.edge_index, g.edge_attr)
+                else:
+                    g.edge_index, _ = remove_self_loops(g.edge_index)
+                    
+                for etype in ['retweet', 'reply', 'mention']:
+                    ei = getattr(g, f'edge_index_{etype}', None)
+                    ea = getattr(g, f'edge_attr_{etype}', None)
+                    if ei is not None:
+                        if ea is not None and ea.size(0) == ei.size(1):
+                            ei, ea = remove_self_loops(ei, ea)
+                            setattr(g, f'edge_attr_{etype}', ea)
+                        else:
+                            ei, _ = remove_self_loops(ei)
+                        setattr(g, f'edge_index_{etype}', ei)
+                        
         print(f"  [CommunityDataProcessor] Loaded {len(graphs)} community graphs.")
 
         # Filter out graphs that are too small
