@@ -233,7 +233,13 @@ def main(cfg: Config) -> None:
                 pipeline_span.set_attribute("collection", collection)
 
                 # ---- Step 1: Build Graph ----
-                with mlflow.start_span(name="build_graph"):
+                with mlflow.start_span(name="build_graph") as span:
+                    span.set_inputs({
+                        "data_dir": cfg.data.data_dir,
+                        "graph_dir": cfg.output.graph_dir,
+                        "graph_type": graph_type,
+                        "load_graph_if_exists": cfg.data.load_graph_if_exists
+                    })
                     if is_community_run:
                         from preprocess.CommunityGraphBuilder import CommunityGraphBuilder
                         from preprocess.CommunityGNNDataProcessor import CommunityGNNDataProcessor
@@ -253,9 +259,18 @@ def main(cfg: Config) -> None:
                             load_graph_if_exists=cfg.data.load_graph_if_exists
                         )
                     pt_path = builder.build_and_save()
+                    span.set_outputs({"pt_path": pt_path})
 
                 # ---- Step 2: Prepare Data ----
-                with mlflow.start_span(name="prepare_data"):
+                with mlflow.start_span(name="prepare_data") as span:
+                    span.set_inputs({
+                        "pt_path": pt_path,
+                        "train_ratio": cfg.data.split[0],
+                        "val_ratio": cfg.data.split[1],
+                        "test_ratio": cfg.data.split[2],
+                        "batch_size": cfg.model.batch_size,
+                        "num_neighbors": list(cfg.model.num_neighbors),
+                    })
                     if is_community_run:
                         processor = CommunityGNNDataProcessor(
                             pt_path,
@@ -280,6 +295,11 @@ def main(cfg: Config) -> None:
                             allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
                         )
                     train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
+                    span.set_outputs({
+                        "in_ch": in_ch,
+                        "edge_dim": edge_dim,
+                        "train_graphs": len(train_data) if hasattr(train_data, "__len__") else "single-graph",
+                    })
 
                 # ---- Models & Baselines execution ----
                 if encoder_name == 'cosine':
@@ -349,17 +369,32 @@ def main(cfg: Config) -> None:
                     )
 
                     # Step 3: Train GNN
-                    with mlflow.start_span(name="train_gnn"):
+                    with mlflow.start_span(name="train_gnn") as span:
+                        span.set_inputs({
+                            "encoder": encoder_name,
+                            "decoder": cfg.model.decoder,
+                            "num_epochs": cfg.model.num_epochs,
+                            "learning_rate": cfg.model.learning_rate,
+                            "weight_decay": cfg.model.weight_decay,
+                            "dropout": cfg.model.dropout,
+                            "neg_ratio": cfg.model.neg_ratio,
+                            "batch_size": cfg.model.batch_size,
+                        })
                         model = trainer.train(train_loader, val_data)
+                        span.set_outputs({"status": "completed"})
 
                     # Step 4: Evaluate GNN
-                    with mlflow.start_span(name="evaluate_gnn"):
+                    with mlflow.start_span(name="evaluate_gnn") as span:
+                        span.set_inputs({
+                            "neg_ratios": list(cfg.evaluation.neg_ratios),
+                        })
                         gnn_eval = GNNEvaluator(model=model)
-                        gnn_eval.evaluate(
+                        results = gnn_eval.evaluate(
                             val_data, test_data,
                             neg_ratios=list(cfg.evaluation.neg_ratios),
                             full_pos_edges=full_pos,
                         )
+                        span.set_outputs({"results": results})
 
 
             if model is not None:
