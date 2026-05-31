@@ -14,7 +14,6 @@ import pickle
 import sys
 from pathlib import Path
 
-import mlflow
 
 import pandas as pd
 import torch
@@ -53,7 +52,6 @@ class GraphBuilder:
                 return path
         return None
 
-    @mlflow.trace(name="build_graph")
     def build_and_save(self) -> str:
         """Build and save the graph as a .pt file. Returns the path to the saved file."""
         output_dir = self.graph_dir

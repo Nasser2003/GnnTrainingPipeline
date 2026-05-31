@@ -232,50 +232,54 @@ def main(cfg: Config) -> None:
                 pipeline_span.set_attribute("encoder", encoder_name)
                 pipeline_span.set_attribute("collection", collection)
 
-                if is_community_run:
-                    from preprocess.CommunityGraphBuilder import CommunityGraphBuilder
-                    from preprocess.CommunityGNNDataProcessor import CommunityGNNDataProcessor
-                    builder = CommunityGraphBuilder(
-                        data_dir=cfg.data.data_dir,
-                        graph_dir=cfg.output.graph_dir,
-                        graph_type=graph_type,
-                        load_graph_if_exists=cfg.data.load_graph_if_exists,
-                        min_nodes=cfg.data.get("community_min_nodes", 5),
-                        min_edges=cfg.data.get("community_min_edges", 5)
-                    )
-                else:
-                    builder = GraphBuilder(
-                        data_dir=cfg.data.data_dir,
-                        graph_dir=cfg.output.graph_dir,
-                        graph_type=graph_type,
-                        load_graph_if_exists=cfg.data.load_graph_if_exists
-                    )
-                pt_path = builder.build_and_save()
+                # ---- Step 1: Build Graph ----
+                with mlflow.start_span(name="build_graph"):
+                    if is_community_run:
+                        from preprocess.CommunityGraphBuilder import CommunityGraphBuilder
+                        from preprocess.CommunityGNNDataProcessor import CommunityGNNDataProcessor
+                        builder = CommunityGraphBuilder(
+                            data_dir=cfg.data.data_dir,
+                            graph_dir=cfg.output.graph_dir,
+                            graph_type=graph_type,
+                            load_graph_if_exists=cfg.data.load_graph_if_exists,
+                            min_nodes=cfg.data.get("community_min_nodes", 5),
+                            min_edges=cfg.data.get("community_min_edges", 5)
+                        )
+                    else:
+                        builder = GraphBuilder(
+                            data_dir=cfg.data.data_dir,
+                            graph_dir=cfg.output.graph_dir,
+                            graph_type=graph_type,
+                            load_graph_if_exists=cfg.data.load_graph_if_exists
+                        )
+                    pt_path = builder.build_and_save()
 
-                if is_community_run:
-                    processor = CommunityGNNDataProcessor(
-                        pt_path,
-                        train_ratio=cfg.data.split[0],
-                        val_ratio=cfg.data.split[1],
-                        test_ratio=cfg.data.split[2],
-                        batch_size=cfg.model.batch_size,
-                        num_neighbors=list(cfg.model.num_neighbors),
-                        graph_split=cfg.data.get("community_graph_split", True),
-                        min_edges_for_split=cfg.data.get("community_min_edges_split", 20),
-                        max_communities=cfg.data.get("max_communities", None),
-                        allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
-                    )
-                else:
-                    processor = GNNDataProcessor(
-                        pt_path,
-                        train_ratio=cfg.data.split[0],
-                        val_ratio=cfg.data.split[1],
-                        test_ratio=cfg.data.split[2],
-                        batch_size=cfg.model.batch_size,
-                        num_neighbors=list(cfg.model.num_neighbors),
-                        allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
-                    )
-                train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
+                # ---- Step 2: Prepare Data ----
+                with mlflow.start_span(name="prepare_data"):
+                    if is_community_run:
+                        processor = CommunityGNNDataProcessor(
+                            pt_path,
+                            train_ratio=cfg.data.split[0],
+                            val_ratio=cfg.data.split[1],
+                            test_ratio=cfg.data.split[2],
+                            batch_size=cfg.model.batch_size,
+                            num_neighbors=list(cfg.model.num_neighbors),
+                            graph_split=cfg.data.get("community_graph_split", True),
+                            min_edges_for_split=cfg.data.get("community_min_edges_split", 20),
+                            max_communities=cfg.data.get("max_communities", None),
+                            allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
+                        )
+                    else:
+                        processor = GNNDataProcessor(
+                            pt_path,
+                            train_ratio=cfg.data.split[0],
+                            val_ratio=cfg.data.split[1],
+                            test_ratio=cfg.data.split[2],
+                            batch_size=cfg.model.batch_size,
+                            num_neighbors=list(cfg.model.num_neighbors),
+                            allow_self_loops=getattr(cfg.data, "allow_self_loops", False)
+                        )
+                    train_data, train_loader, val_data, test_data, full_pos, in_ch, edge_dim, edge_dim_retweet, edge_dim_reply, edge_dim_mention = processor.prepare_data()
 
                 # ---- Models & Baselines execution ----
                 if encoder_name == 'cosine':
@@ -344,14 +348,19 @@ def main(cfg: Config) -> None:
                         early_stopping_patience=cfg.model.early_stopping_patience,
                     )
 
-                    model = trainer.train(train_loader, val_data)
+                    # Step 3: Train GNN
+                    with mlflow.start_span(name="train_gnn"):
+                        model = trainer.train(train_loader, val_data)
 
-                    gnn_eval = GNNEvaluator(model=model)
-                    gnn_eval.evaluate(
-                        val_data, test_data,
-                        neg_ratios=list(cfg.evaluation.neg_ratios),
-                        full_pos_edges=full_pos,
-                    )
+                    # Step 4: Evaluate GNN
+                    with mlflow.start_span(name="evaluate_gnn"):
+                        gnn_eval = GNNEvaluator(model=model)
+                        gnn_eval.evaluate(
+                            val_data, test_data,
+                            neg_ratios=list(cfg.evaluation.neg_ratios),
+                            full_pos_edges=full_pos,
+                        )
+
 
             if model is not None:
                 # Explicit pip_requirements needed because PyG packages are installed

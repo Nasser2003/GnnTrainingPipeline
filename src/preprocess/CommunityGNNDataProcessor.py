@@ -1,6 +1,6 @@
 import random
 import torch
-import mlflow
+
 from torch_geometric.data import Batch
 from torch_geometric.loader import LinkNeighborLoader
 from torch_geometric.transforms import RandomLinkSplit
@@ -17,7 +17,6 @@ class CommunityGNNDataProcessor(GNNDataProcessor):
         self.min_edges_for_split = min_edges_for_split
         self.max_communities = max_communities
 
-    @mlflow.trace(name="prepare_data_community")
     def prepare_data(self):
         use_graph_split = self.graph_split
         print(f"  [CommunityDataProcessor] Loading graphs from: {self.data_path}")
