@@ -73,6 +73,7 @@ class GNNTraining:
         Mini-batch training loop using LinkNeighborLoader.
         Returns the best (model) by validation AUC.
         """
+        parent_span = mlflow.get_current_active_span()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -196,7 +197,12 @@ class GNNTraining:
             avg_loss = total_loss / max(used_batches, 1)
 
             # Full-graph Validation + epoch span (must stay inside active trace context)
-            with mlflow.start_span(name="epoch") as epoch_span:
+            if parent_span is not None:
+                epoch_ctx = mlflow.start_span_no_context(name="epoch", parent_span=parent_span)
+            else:
+                epoch_ctx = mlflow.start_span(name="epoch")
+
+            with epoch_ctx as epoch_span:
                 val_auc = self._evaluate_auc(model, val_data, device)
                 epoch_duration = time.time() - epoch_start
                 epoch_span.set_attribute("epoch", epoch)
