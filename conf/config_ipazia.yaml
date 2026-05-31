@@ -3,7 +3,7 @@ hydra:
   sweeper:
     params:
       data.graph_type: reply
-      model.encoder: transformer
+      model.encoder: gcn
       # data.graph_type: reply,retweet,mention,late_fuse
       # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
@@ -24,7 +24,7 @@ data:
   graph_type: reply
   split: [0.70, 0.15, 0.15]
   allow_self_loops: false
-  max_communities: 250
+  max_communities: 50
 
 model:
   encoder: none
@@ -56,7 +56,7 @@ output:
   graph_dir: ${output.base_dir}/graphs/${data.run_id}
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
   mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:///app/outputs/mlflow/mlflow.db"}
-  experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v4"}
+  experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-experimentations"}
 
 
 defaults:

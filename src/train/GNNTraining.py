@@ -68,7 +68,6 @@ class GNNTraining:
         ])
         return F.binary_cross_entropy_with_logits(scores, labels)
 
-    @mlflow.trace(name="train_gnn")
     def train(self, train_loader, val_data):
         """
         Mini-batch training loop using LinkNeighborLoader.
@@ -182,11 +181,10 @@ class GNNTraining:
 
             avg_loss = total_loss / max(used_batches, 1)
 
-            # Full-graph Validation
-            val_auc = self._evaluate_auc(model, val_data, device)
-            epoch_duration = time.time() - epoch_start
-
+            # Full-graph Validation + epoch span (must stay inside active trace context)
             with mlflow.start_span(name="epoch") as epoch_span:
+                val_auc = self._evaluate_auc(model, val_data, device)
+                epoch_duration = time.time() - epoch_start
                 epoch_span.set_attribute("epoch", epoch)
                 epoch_span.set_attribute("train_loss", round(avg_loss, 6))
                 epoch_span.set_attribute("val_auc", round(val_auc, 6))

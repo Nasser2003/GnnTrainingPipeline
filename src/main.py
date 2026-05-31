@@ -240,8 +240,8 @@ def main(cfg: Config) -> None:
                         graph_dir=cfg.output.graph_dir,
                         graph_type=graph_type,
                         load_graph_if_exists=cfg.data.load_graph_if_exists,
-                        min_nodes=cfg.data.get("community_min_nodes", 20),
-                        min_edges=cfg.data.get("community_min_edges", 20)
+                        min_nodes=cfg.data.get("community_min_nodes", 5),
+                        min_edges=cfg.data.get("community_min_edges", 5)
                     )
                 else:
                     builder = GraphBuilder(
