@@ -82,7 +82,6 @@ class Evaluator:
                 
         return best_t
 
-    @mlflow.trace(name="evaluate_metrics")
     def evaluate_metrics_master(self, name, data, neg_ratio, scorer, threshold=0.5, full_pos_edges=None):
         """
         Evaluate link prediction performance with PR-AUC support.

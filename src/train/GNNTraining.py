@@ -143,7 +143,20 @@ class GNNTraining:
                         if global_ei is None or global_ei.size(1) == 0:
                             continue
                         
-                        # Vectorized: remap and filter in one pass
+                        # Safety: discard edges whose node IDs exceed the lookup table.
+                        # This can happen when a custom edge_index spans nodes outside
+                        # the current mini-batch's sampled node set (n_id range).
+                        valid_range = (global_ei[0] < num_global_nodes) & (global_ei[1] < num_global_nodes)
+                        if not valid_range.all():
+                            global_ei = global_ei[:, valid_range]
+                            ea_pre = getattr(batch, f'edge_attr_{etype}', None)
+                            if ea_pre is not None:
+                                setattr(batch, f'edge_attr_{etype}', ea_pre[valid_range])
+                            if global_ei.size(1) == 0:
+                                setattr(batch, f'edge_index_{etype}', global_ei)
+                                continue
+                        
+                        # Vectorized: remap global → local and filter out-of-batch edges
                         local_src = lookup[global_ei[0]]
                         local_dst = lookup[global_ei[1]]
                         mask = (local_src >= 0) & (local_dst >= 0)
@@ -155,6 +168,7 @@ class GNNTraining:
                         if ea is not None:
                             setattr(batch, f'edge_attr_{etype}', ea[mask])
                 
+
                 # Encode the sampled subgraph
                 z = model.encode(batch)
 

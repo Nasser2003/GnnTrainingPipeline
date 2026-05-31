@@ -354,10 +354,25 @@ def main(cfg: Config) -> None:
                     )
 
             if model is not None:
+                # Explicit pip_requirements needed because PyG packages are installed
+                # via custom --find-links / --index-url URLs that MLflow cannot auto-infer.
+                # Without this, log_model falls back to only ['torch', 'cloudpickle'],
+                # making the artifact unloadable on a fresh environment.
+                _pyg_whl = "https://data.pyg.org/whl/torch-2.6.0+cu124.html"
                 mlflow.pytorch.log_model(
                     model,
                     name="model",
                     registered_model_name=encoder_name,
+                    pip_requirements=[
+                        "torch==2.6.0",
+                        "torch-geometric",
+                        f"torch-scatter==2.1.2 --find-links {_pyg_whl}",
+                        f"torch-sparse==0.6.18 --find-links {_pyg_whl}",
+                        f"torch-cluster==1.6.3 --find-links {_pyg_whl}",
+                        "scikit-learn",
+                        "numpy",
+                        "pandas",
+                    ],
                 )
             
             run_duration = time.time() - run_start_time
