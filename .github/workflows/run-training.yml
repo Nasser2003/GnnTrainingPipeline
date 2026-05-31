@@ -200,6 +200,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Clean Python Cache
+        run: |
+          echo "Cleaning __pycache__ directories and .pyc files..."
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type f -name "*.pyc" -delete 2>/dev/null || true
+
       - name: Prepare Output Directories
         run: |
           mkdir -p ${{ env.LOCAL_TRAINING_DIR }}/models
