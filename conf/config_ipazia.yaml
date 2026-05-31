@@ -29,7 +29,7 @@ data:
 model:
   encoder: none
   decoder: mlp
-  num_epochs: 200            # Was 50 — too short with early_stopping_patience=15
+  num_epochs: 100            # Was 50 — too short with early_stopping_patience=15
   learning_rate: 0.002
   weight_decay: 1e-5
   hidden_dim: 64            # Good for 35 node features (≈4x)
@@ -40,7 +40,7 @@ model:
   decoder_dropout: 0.1
   scheduler: false            # Enable LR decay on plateau — important for community graphs
   grad_clip: 0             # Enable gradient clipping — small batches can cause spikes
-  early_stopping_patience: 100  # Was 10 — more room before stopping
+  early_stopping_patience: 20  # Was 10 — more room before stopping
   seed: 777
   fusion: mean
   batch_size: 64            # Was 512 — most communities have <100 nodes; smaller batches fit better
