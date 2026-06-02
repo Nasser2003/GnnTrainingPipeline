@@ -11,7 +11,7 @@ on:
 env:
   # --- Pipeline configuration ---
   CONFIG_NAME:         'config_ipazia'
-  RUN_ID:              '8cd290e451f511f182c408f1eaf4fe18'
+  RUN_ID:              '70868f305c5e11f1b93208f1eaf4fe18'
   OVERRIDE_DOWNLOAD:   'false'
   EXPERIMENT_NAME:     'gnn-link-prediction-experimentations'
   GPU_TIMEOUT:         0      # 0 minutes => Will directly use a CPU whenever the GPU is not available,
