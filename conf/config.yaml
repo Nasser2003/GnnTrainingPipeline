@@ -14,7 +14,7 @@ data:
   # Base directory for all extraction runs
   base_dir: ../GraphAnalysis/resources
   # Specific extraction run ID
-  run_id: 8cd290e451f511f182c408f1eaf4fe18
+  run_id: 6bfdd73b5ac511f1bacf010101010000
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}
@@ -53,7 +53,7 @@ output:
   log_dir: ${output.base_dir}/logs
   graph_dir: ${output.base_dir}/graphs/${data.run_id}
   # Fallback to local SQLite if MLFLOW_TRACKING_URI is not set (overridden by env var in main.py)
-  mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "http://127.0.0.1:5050"}
+  mlflow_tracking_uri: ${oc.env:MLFLOW_TRACKING_URI, "sqlite:////mlflow/auth.db"}
   experiment_name: ${oc.env:MLFLOW_EXPERIMENT_NAME, "gnn-link-prediction-v2"}
 
 

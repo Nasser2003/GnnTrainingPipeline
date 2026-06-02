@@ -2,10 +2,10 @@ hydra:
   mode: RUN
   sweeper:
     params:
-      data.graph_type: reply
-      model.encoder: gcn
-      # data.graph_type: reply,retweet,mention,late_fuse
-      # model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
+      # data.graph_type: reply
+      # model.encoder: gcn
+      data.graph_type: reply,retweet,mention,late_fuse
+      model.encoder: cosine,mlp,gcn,gat,gatv2,gine,sage,transformer,nnconv
   run:
     dir: ${data.base_dir}/singlerun/${now:%Y-%m-%d}_${now:%H-%M-%S}
   sweep:
@@ -16,7 +16,7 @@ data:
   # Base directory for all extraction runs
   base_dir: extraction/outputs
   # Specific extraction run ID
-  run_id: f63a692e505d11f1944b08f1eaf4fe18
+  run_id: 70868f305c5e11f1b93208f1eaf4fe18
   
   # Combined path used by the pipeline
   data_dir: ${data.base_dir}/${data.run_id}
@@ -29,7 +29,7 @@ data:
 model:
   encoder: none
   decoder: mlp
-  num_epochs: 5            # Was 50 — too short with early_stopping_patience=15
+  num_epochs: 100            # Was 50 — too short with early_stopping_patience=15
   learning_rate: 0.002
   weight_decay: 1e-5
   hidden_dim: 64            # Good for 35 node features (≈4x)
@@ -42,7 +42,7 @@ model:
   grad_clip: 0             # Enable gradient clipping — small batches can cause spikes
   early_stopping_patience: 25  # Was 10 — more room before stopping
   seed: 777
-  fusion: mean
+  fusion: concat
   batch_size: 64            # Was 512 — most communities have <100 nodes; smaller batches fit better
   num_neighbors: [-1, -1]    # Was [10, 5] — larger fanout for sparse communities
 

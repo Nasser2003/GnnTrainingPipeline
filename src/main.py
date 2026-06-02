@@ -205,27 +205,72 @@ def main(cfg: Config) -> None:
                 )
                 mlflow.log_input(dataset, context="metadata")
 
-            mlflow.log_params({
-                "encoder": encoder_name,
-                "graph_type": graph_type,
-                "decoder": cfg.model.decoder,
-                "hidden_dim": cfg.model.hidden_dim,
-                "embed_dim": cfg.model.embed_dim,
-                "learning_rate": cfg.model.learning_rate,
-                "num_epochs": cfg.model.num_epochs,
-                "weight_decay": cfg.model.weight_decay,
-                "dropout": cfg.model.dropout,
-                "neg_ratio": cfg.model.neg_ratio,
-                "decoder_hidden": cfg.model.decoder_hidden,
-                "decoder_dropout": cfg.model.decoder_dropout,
-                "scheduler": cfg.model.scheduler,
-                "grad_clip": grad_clip,
-                "fusion": cfg.model.fusion,
-                "early_stopping_patience": cfg.model.early_stopping_patience,
-                "batch_size": cfg.model.batch_size,
-                "seed": cfg.model.seed,
-                "allow_self_loops": getattr(cfg.data, "allow_self_loops", False),
-            })
+            # Log all parameters from hydra config
+            try:
+                from omegaconf import OmegaConf
+                
+                def flatten_dict(d, parent_key='', sep='.'):
+                    items = []
+                    for k, v in d.items():
+                        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                        if isinstance(v, dict):
+                            items.extend(flatten_dict(v, new_key, sep=sep).items())
+                        else:
+                            if isinstance(v, list):
+                                items.append((new_key, str(v)))
+                            else:
+                                items.append((new_key, v))
+                    return dict(items)
+
+                dict_cfg = OmegaConf.to_container(cfg, resolve=True)
+                flat_params = flatten_dict(dict_cfg)
+                
+                # Also log root-level overrides for easy filtering in MLflow UI columns
+                flat_params["encoder"] = encoder_name
+                flat_params["graph_type"] = graph_type
+                flat_params["grad_clip"] = grad_clip
+                flat_params["is_community_run"] = is_community_run
+                flat_params["collection"] = collection
+                flat_params["users_processed"] = users_processed
+                flat_params["extraction_date"] = extraction_date
+                if gpu_id is not None:
+                    flat_params["gpu_id"] = gpu_id
+                
+                mlflow.log_params(flat_params)
+                log.info("Successfully logged all parameters from config.")
+            except Exception as e:
+                log.warning(f"Failed to log all parameters: {e}")
+
+            # Log config file and github workflow files as MLflow artifacts
+            try:
+                from hydra.core.hydra_config import HydraConfig
+                import hydra.utils
+                
+                # 1. Config YAML
+                config_name = HydraConfig.get().job.config_name
+                conf_path = hydra.utils.to_absolute_path(f"conf/{config_name}.yaml")
+                if os.path.exists(conf_path):
+                    mlflow.log_artifact(conf_path, artifact_path="config")
+                    log.info(f"Logged config artifact: {conf_path}")
+                else:
+                    log.warning(f"Config path not found for artifact logging: {conf_path}")
+            except Exception as e:
+                log.warning(f"Failed to log config artifact: {e}")
+
+            try:
+                import hydra.utils
+                # 2. GitHub Workflows
+                workflow_dir = hydra.utils.to_absolute_path(".github/workflows")
+                if os.path.exists(workflow_dir):
+                    for f in os.listdir(workflow_dir):
+                        if f.endswith(".yml") or f.endswith(".yaml"):
+                            f_path = os.path.join(workflow_dir, f)
+                            mlflow.log_artifact(f_path, artifact_path="workflow")
+                            log.info(f"Logged workflow artifact: {f_path}")
+                else:
+                    log.warning(f"Workflow directory not found for artifact logging: {workflow_dir}")
+            except Exception as e:
+                log.warning(f"Failed to log workflow artifacts: {e}")
 
             with mlflow.start_span(name="pipeline") as pipeline_span:
                 pipeline_span.set_attribute("graph_type", graph_type)
