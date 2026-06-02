@@ -44,7 +44,7 @@ model:
   seed: 777
   fusion: concat
   batch_size: 64            # Was 512 — most communities have <100 nodes; smaller batches fit better
-  num_neighbors: [-1, -1]    # Was [10, 5] — larger fanout for sparse communities
+  num_neighbors: [10, 5]    # Was [10, 5] — larger fanout for sparse communities
 
 evaluation:
   neg_ratios: [1, 9, 100]
